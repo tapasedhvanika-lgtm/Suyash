@@ -671,17 +671,19 @@ const ActionMenu = ({ contract, onView, onEdit, onDelete, anchorEl, onClose, onO
 
   return (
     <>
-      <Tooltip title="Actions">
-        <IconButton
-          size="small"
-          onClick={onOpen}
-          sx={{
-            color: COLORS.text.secondary,
-            '&:hover': { bgcolor: `${COLORS.primary}20` }
-          }}
-        >
-          <MoreVertIcon fontSize="small" />
-        </IconButton>
+            <Tooltip title="Actions">
+        <span> {/* <--- ADD THIS SPAN */}
+          <IconButton
+            size="small"
+            onClick={onOpen}
+            sx={{
+              color: COLORS.text.secondary,
+              '&:hover': { bgcolor: `${COLORS.primary}20` }
+            }}
+          >
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </span> {/* <--- CLOSE THE SPAN */}
       </Tooltip>
       <Menu
         anchorEl={anchorEl}
@@ -1042,13 +1044,14 @@ const ContractMaster = () => {
                   return (
                     <TableRow key={contract._id} hover selected={isSelected} sx={{ '&:hover': { bgcolor: COLORS.background.hover }, '& .MuiTableCell-root': { py: 1.5, fontSize: '0.75rem', borderColor: COLORS.border } }}>
                       {canDelete && <TableCell padding="checkbox"><Checkbox checked={isSelected} onChange={() => handleSelect(contract._id)} sx={{ color: COLORS.primary, '&.Mui-checked': { color: COLORS.primary } }} /></TableCell>}
-                      <TableCell><Typography sx={{ fontWeight: 600, color: COLORS.primary }}>{contract.AgencyCode || '-'}</Typography></TableCell>
-                      <TableCell><Typography sx={{ fontWeight: 500 }}>{contract.AgencyName || '-'}</Typography></TableCell>
-                      <TableCell>{contract.ContactPerson || '-'}</TableCell>
-                      <TableCell>{contract.ContactPhone || '-'}</TableCell>
-                      <TableCell>{contract.ContactEmail || '-'}</TableCell>
-                      <TableCell sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contract.Address || '-'}</TableCell>
-                      <TableCell>{getStatusChip(contract.IsActive)}</TableCell>
+                      <TableCell><Typography sx={{ fontWeight: 600, color: COLORS.primary }}>{contract.agencyCode || '-'}</Typography></TableCell>
+                      <TableCell><Typography sx={{ fontWeight: 500 }}>{contract.agencyName || '-'}</Typography></TableCell>
+                      <TableCell>{contract.contactPerson || '-'}</TableCell>
+                      <TableCell>{contract.contactPhone || '-'}</TableCell>
+                      <TableCell>{contract.contactEmail || '-'}</TableCell>
+                      <TableCell sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{contract.address || '-'}</TableCell>
+                      <TableCell>{getStatusChip(contract.status === 'Active')}</TableCell>
+                      
                       <TableCell align="center">
                         <ActionMenu 
                           contract={contract} 

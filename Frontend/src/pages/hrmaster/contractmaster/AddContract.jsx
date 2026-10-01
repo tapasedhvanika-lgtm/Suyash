@@ -820,24 +820,30 @@ const AddContract = ({ open, onClose, onAdd }) => {
     return isValid;
   };
 
-  const handleSubmit = async () => {
+     const handleSubmit = async () => {
     if (!validateForm()) return;
     setLoading(true);
     setError('');
+
     try {
       const token = localStorage.getItem('token');
+
+      // 👇 THIS PAYLOAD OBJECT IS THE MISSING KEY
+      const payload = {
+        agencyCode: formData.AgencyCode.trim(),
+        agencyName: formData.AgencyName.trim(),
+        contactPerson: formData.ContactPerson.trim(),
+        contactPhone: formData.ContactPhone.trim(),
+        contactEmail: formData.ContactEmail.trim(),
+        address: formData.Address?.trim() || '',
+        notes: formData.Notes?.trim() || '',
+        status: formData.IsActive ? 'Active' : 'Inactive'
+      };
+
+      // 👇 SEND THE PAYLOAD, NOT formData
       const response = await axios.post(
         `${BASE_URL}/api/contract-agencies`,
-        {
-          AgencyCode: formData.AgencyCode.trim(),
-          AgencyName: formData.AgencyName.trim(),
-          ContactPerson: formData.ContactPerson.trim(),
-          ContactPhone: formData.ContactPhone.trim(),
-          ContactEmail: formData.ContactEmail.trim(),
-          Address: formData.Address?.trim() || '',
-          Notes: formData.Notes?.trim() || '',
-          IsActive: formData.IsActive
-        },
+        payload, 
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -845,20 +851,22 @@ const AddContract = ({ open, onClose, onAdd }) => {
           }
         }
       );
+
       if (response.data.success) {
         if (onAdd) onAdd(response.data.data);
-        onClose();
+        onClose(); 
       } else {
         setError(response.data.message || 'Failed to add agency');
       }
     } catch (err) {
       console.error('Add agency error:', err);
-      setError(err.response?.data?.message || 'Failed to add agency. Please try again.');
+      // 👇 SHOW THE REAL BACKEND ERROR
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to add agency. Please try again.');
     } finally {
       setLoading(false);
     }
   };
-
+  
   const handleClose = () => {
     onClose();
   };
