@@ -421,6 +421,44 @@ const getCalibrationHistory = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+// ======================================================
+// DELETE GAUGE (SOFT DELETE)
+// ======================================================
+const deleteGauge = async (req, res) => {
+  try {
+    const gauge = await GaugeMaster.findById(req.params.id);
+
+    if (!gauge) {
+      return res.status(404).json({
+        success: false,
+        message: 'Gauge not found'
+      });
+    }
+
+    if (!gauge.is_active) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gauge is already inactive'
+      });
+    }
+
+    gauge.is_active = false;
+
+    await gauge.save();
+
+    return res.json({
+      success: true,
+      message: 'Gauge deleted successfully',
+      data: gauge
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
 
 module.exports = {
   registerGauge,
@@ -430,4 +468,5 @@ module.exports = {
   recordCalibration,
   updateGauge,
   getCalibrationHistory,
+    deleteGauge,
 };

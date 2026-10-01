@@ -9,6 +9,7 @@ const {
   recordCalibration,
   updateGauge,
   getCalibrationHistory,
+    deleteGauge,
 } = require('../../controllers/Quality/gaugeController');
 
 const { protect, authorize } = require('../../middleware/authMiddleware');
@@ -316,5 +317,11 @@ router.put('/:id', updateGauge);
  *         description: Server error
  */
 router.get('/:id/calibration-history', getCalibrationHistory);
+// ======================================================
+// DELETE GAUGE (SOFT DELETE)
+// ======================================================
+
+router.delete('/:id', deleteGauge);
+
 
 module.exports = router;

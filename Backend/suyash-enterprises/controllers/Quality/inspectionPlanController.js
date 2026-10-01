@@ -255,6 +255,44 @@ const rejectPlan = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+// ======================================================
+// DELETE INSPECTION PLAN (SOFT DELETE)
+// ======================================================
+const deletePlan = async (req, res) => {
+  try {
+    const plan = await InspectionPlan.findById(req.params.id);
+
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inspection Plan not found'
+      });
+    }
+
+    if (!plan.is_active) {
+      return res.status(400).json({
+        success: false,
+        message: 'Inspection Plan is already inactive'
+      });
+    }
+
+    plan.is_active = false;
+
+    await plan.save();
+
+    return res.json({
+      success: true,
+      message: 'Inspection Plan deleted successfully',
+      data: plan
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
 
 module.exports = {
   createPlan,
@@ -265,4 +303,5 @@ module.exports = {
   submitForApproval,
   approvePlan,
   rejectPlan,
+    deletePlan,
 };
