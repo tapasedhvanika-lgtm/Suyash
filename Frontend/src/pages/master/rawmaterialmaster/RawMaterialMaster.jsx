@@ -1,0 +1,1550 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Box,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Button,
+  TextField,
+  InputAdornment,
+  Tooltip,
+  Typography,
+  Snackbar,
+  TablePagination,
+  Checkbox,
+  Stack,
+  Chip,
+  Avatar,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Alert,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  LinearProgress
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  MoreVert as MoreVertIcon,
+  Refresh as RefreshIcon,
+  AttachMoney as MoneyIcon,
+  Percent as PercentIcon,
+  DateRange as DateIcon,
+  Category as CategoryIcon,
+  FileDownload as ExportIcon,
+  FileUpload as ImportIcon,
+  CloudUpload as UploadIcon
+} from '@mui/icons-material';
+import axios from 'axios';
+import BASE_URL from '../../../config/Config';
+import { hasPermission, getAllowedActions, ACTIONS, MODULES, PAGES } from '../../../utils/modulePermissions';
+
+// Import modal components
+import AddRawMaterial from './AddRawMaterial';
+import EditRawMaterial from './EditRawMaterial';
+import ViewRawMaterial from './ViewRawMaterial';
+import DeleteRawMaterial from './DeleteRawMaterial';
+
+// Color constants - Single color #063C3F throughout
+const COLORS = {
+  primary: '#063C3F',
+  primaryLight: '#E8F0F1',
+  primaryDark: '#05292B',
+  text: {
+    primary: '#151C26',
+    secondary: '#4B5568',
+    tertiary: '#94A3B8',
+    light: '#FFFFFF',
+    lightMuted: 'rgba(255, 255, 255, 0.9)'
+  },
+  background: {
+    white: '#FFFFFF',
+    light: '#F8FFFC',
+    hover: '#F0FDF9',
+    tableHeader: '#063C3F'
+  },
+  border: '#E3E8EF',
+  chips: {
+    active: '#9FE2BF',
+    inactive: '#F1F5F9',
+    suspended: '#FEF3C7',
+    locked: '#FEE2E2'
+  }
+};
+
+// Loading state component
+const LoadingState = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+    <CircularProgress size={40} sx={{ color: COLORS.primary }} />
+  </Box>
+);
+
+// Access Denied component
+const AccessDenied = () => (
+  <Box sx={{ p: 4, textAlign: 'center' }}>
+    <Typography variant="h6" color="error" sx={{ mb: 2 }}>
+      Access Denied
+    </Typography>
+    <Typography variant="body2" color="text.secondary">
+      You don't have permission to view this page. Please contact your administrator.
+    </Typography>
+  </Box>
+);
+
+// Action Menu Component with permission checks
+const ActionMenu = ({ item, onView, onEdit, onDelete, anchorEl, onClose, onOpen, permissions }) => {
+  const canView = hasPermission(permissions, MODULES.RAW_MATERIAL_MASTER, PAGES.RAW_MATERIAL, ACTIONS.VIEW);
+  const canUpdate = hasPermission(permissions, MODULES.RAW_MATERIAL_MASTER, PAGES.RAW_MATERIAL, ACTIONS.UPDATE);
+  const canDelete = hasPermission(permissions, MODULES.RAW_MATERIAL_MASTER, PAGES.RAW_MATERIAL, ACTIONS.DELETE);
+
+  // If no actions available, don't render the menu
+  if (!canView && !canUpdate && !canDelete) {
+    return null;
+  }
+
+  return (
+    <>
+      <Tooltip title="Actions">
+        <IconButton
+          size="small"
+          onClick={onOpen}
+          sx={{
+            color: COLORS.text.secondary,
+            '&:hover': {
+              bgcolor: `${COLORS.primary}20`
+            }
+          }}
+        >
+          <MoreVertIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={onClose}
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            mt: 1,
+            minWidth: 180,
+            borderRadius: 2,
+            border: `1px solid ${COLORS.border}`,
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }
+        }}
+      >
+        {canView && (
+          <MenuItem 
+            onClick={() => {
+              onView(item);
+              onClose();
+            }}
+            sx={{ py: 1.5 }}
+          >
+            <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}>
+              <ViewIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              <Typography variant="body2" fontWeight={500} sx={{ color: COLORS.text.primary, fontSize: '0.75rem' }}>
+                View Details
+              </Typography>
+            </ListItemText>
+          </MenuItem>
+        )}
+        
+        {canUpdate && (
+          <MenuItem 
+            onClick={() => {
+              onEdit(item);
+              onClose();
+            }}
+            sx={{ py: 1.5 }}
+          >
+            <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              <Typography variant="body2" fontWeight={500} sx={{ color: COLORS.text.primary, fontSize: '0.75rem' }}>
+                Edit
+              </Typography>
+            </ListItemText>
+          </MenuItem>
+        )}
+        
+        {(canView || canUpdate) && canDelete && <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />}
+        
+        {canDelete && (
+          <MenuItem 
+            onClick={() => {
+              onDelete(item);
+              onClose();
+            }}
+            sx={{ py: 1.5 }}
+          >
+            <ListItemIcon sx={{ color: '#EF4444', minWidth: 36 }}>
+              <DeleteIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              <Typography variant="body2" fontWeight={500} color="#EF4444" sx={{ fontSize: '0.75rem' }}>
+                Delete
+              </Typography>
+            </ListItemText>
+          </MenuItem>
+        )}
+      </Menu>
+    </>
+  );
+};
+
+const RawMaterialMaster = () => {
+  // State for data
+  const [materials, setMaterials] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  // Selection state
+  const [selected, setSelected] = useState([]);
+  
+  // Menu state for action buttons
+  const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
+  const [selectedMaterialForAction, setSelectedMaterialForAction] = useState(null);
+  
+  // Modal state
+  const [openAddModal, setOpenAddModal] = useState(false);
+  const [openEditModal, setOpenEditModal] = useState(false);
+  const [openViewModal, setOpenViewModal] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  
+  // Import/Export state
+  const [openImportDialog, setOpenImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const fileInputRef = useRef(null);
+  
+  // Selected material
+  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  
+  // Notification state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  // User permissions state
+  const [userPermissions, setUserPermissions] = useState([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+
+  // Ref to track if we're currently searching (typing)
+  const isSearchingRef = useRef(false);
+  const searchTimeoutRef = useRef(null);
+
+  // Fetch user permissions
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${BASE_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.data.success) {
+          const userData = response.data.data;
+          setIsSuperAdmin(userData.isSuperAdmin || false);
+          
+          // Set permissions array
+          if (userData.permissions && Array.isArray(userData.permissions)) {
+            setUserPermissions(userData.permissions);
+          } else {
+            setUserPermissions([]);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching user permissions:', err);
+        setUserPermissions([]);
+      } finally {
+        setPermissionsLoaded(true);
+      }
+    };
+    
+    fetchUserPermissions();
+  }, []);
+
+  // Check permission helper
+  const checkPermission = useCallback((action) => {
+    // Super admin has all permissions
+    if (isSuperAdmin) return true;
+    
+    return hasPermission(
+      userPermissions,
+      MODULES.RAW_MATERIAL_MASTER,
+      PAGES.RAW_MATERIAL,
+      action
+    );
+  }, [userPermissions, isSuperAdmin]);
+
+  // Get allowed actions for this page
+  const allowedActions = useCallback(() => {
+    if (isSuperAdmin) {
+      return [ACTIONS.VIEW, ACTIONS.CREATE, ACTIONS.UPDATE, ACTIONS.DELETE, 
+              ACTIONS.EXPORT, ACTIONS.IMPORT];
+    }
+    return getAllowedActions(
+      userPermissions,
+      MODULES.RAW_MATERIAL_MASTER,
+      PAGES.RAW_MATERIAL
+    );
+  }, [userPermissions, isSuperAdmin]);
+
+  // Permission checks
+  const canViewPage = checkPermission(ACTIONS.VIEW);
+  const canCreate = checkPermission(ACTIONS.CREATE);
+  const canUpdate = checkPermission(ACTIONS.UPDATE);
+  const canDelete = checkPermission(ACTIONS.DELETE);
+  const canExport = checkPermission(ACTIONS.EXPORT);
+  const canImport = checkPermission(ACTIONS.IMPORT);
+
+  // Handle search input change with proper debounce
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    isSearchingRef.current = true;
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounce
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+      setPage(0);
+      setSelected([]);
+      isSearchingRef.current = false;
+    }, 500);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Fetch raw materials from API with pagination
+  const fetchMaterials = useCallback(async () => {
+    if (!canViewPage && !isSuperAdmin) return;
+    
+    // Don't show loading indicator while typing search
+    if (!isSearchingRef.current) {
+      setLoading(true);
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: rowsPerPage
+      });
+      
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+      
+      const response = await axios.get(`${BASE_URL}/api/raw-materials?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.data.success) {
+        const { data: materialsData, pagination } = response.data;
+        setMaterials(materialsData || []);
+        setTotalItems(pagination.totalItems || pagination.total || 0);
+      } else {
+        showNotification('Failed to load raw materials', 'error');
+      }
+    } catch (err) {
+      console.error('Error fetching raw materials:', err);
+      showNotification('Failed to load raw materials. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, rowsPerPage, searchTerm, canViewPage, isSuperAdmin]);
+
+  // Fetch materials when dependencies change - only if user has permission
+  useEffect(() => {
+    if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
+      fetchMaterials();
+    }
+  }, [fetchMaterials, canViewPage, isSuperAdmin, permissionsLoaded]);
+
+  // Handle refresh
+  const handleRefresh = () => {
+    fetchMaterials();
+    showNotification('Data refreshed', 'success');
+  };
+  
+  // Handle select all - only if user has delete permission
+  const handleSelectAll = (event) => {
+    if (!canDelete) return;
+    
+    if (event.target.checked) {
+      setSelected(materials.map(material => material._id));
+    } else {
+      setSelected([]);
+    }
+  };
+  
+  // Handle single selection - only if user has delete permission
+  const handleSelect = (id) => {
+    if (!canDelete) return;
+    
+    const selectedIndex = selected.indexOf(id);
+    let newSelected = [];
+    
+    if (selectedIndex === -1) {
+      newSelected = newSelected.concat(selected, id);
+    } else {
+      newSelected = selected.filter(item => item !== id);
+    }
+    
+    setSelected(newSelected);
+  };
+  
+  // Handle page change
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+    setCurrentPage(newPage + 1);
+    setSelected([]);
+  };
+  
+  // Handle rows per page change
+  const handleChangeRowsPerPage = (event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setPage(0);
+    setCurrentPage(1);
+    setSelected([]);
+  };
+  
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (!canDelete || selected.length === 0) return;
+    
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${BASE_URL}/api/raw-materials/bulk-delete`, 
+        { ids: selected },
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
+      setSelected([]);
+      
+      if (materials.length === selected.length && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+        setPage(prev => prev - 1);
+      } else {
+        fetchMaterials();
+      }
+      
+      showNotification(`${selected.length} raw material(s) deleted successfully!`, 'success');
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      showNotification('Failed to delete raw materials', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle export data
+  const handleExport = async () => {
+    if (!canExport) return;
+    
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`${BASE_URL}/api/raw-materials/export`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'raw-materials-export.csv';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      showNotification('Data exported successfully!', 'success');
+    } catch (err) {
+      console.error('Error exporting data:', err);
+      showNotification('Failed to export data. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Handle download import template
+  const handleDownloadTemplate = async () => {
+    if (!canImport) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`${BASE_URL}/api/raw-materials/import-template`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'raw-materials-template.csv';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      showNotification('Template downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('Error downloading template:', err);
+      showNotification('Failed to download template. Please try again.', 'error');
+    }
+  };
+  
+  // Handle file selection for import
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      
+      if (fileExtension !== 'csv') {
+        showNotification('Please upload a valid CSV file', 'error');
+        event.target.value = '';
+        return;
+      }
+      
+      setImportFile(file);
+    }
+  };
+  
+  // Handle import submission
+  const handleImport = async () => {
+    if (!importFile) {
+      showNotification('Please select a file to import', 'warning');
+      return;
+    }
+    
+    setImportLoading(true);
+    setImportProgress(0);
+    
+    const formData = new FormData();
+    formData.append('file', importFile);
+    
+    try {
+      const token = localStorage.getItem('token');
+      
+      const progressInterval = setInterval(() => {
+        setImportProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+      
+      const response = await axios.post(`${BASE_URL}/api/raw-materials/import`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      clearInterval(progressInterval);
+      setImportProgress(100);
+      
+      if (response.data.success) {
+        showNotification(response.data.message || 'Data imported successfully!', 'success');
+        fetchMaterials();
+        setOpenImportDialog(false);
+        setImportFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } else {
+        showNotification(response.data.message || 'Failed to import data', 'error');
+      }
+    } catch (err) {
+      console.error('Error importing data:', err);
+      const errorMessage = err.response?.data?.message || 'Failed to import data. Please check your file format.';
+      showNotification(errorMessage, 'error');
+    } finally {
+      setImportLoading(false);
+      setImportProgress(0);
+    }
+  };
+  
+  // Handle add material
+  const handleAddMaterial = () => {
+    fetchMaterials();
+    showNotification('Raw material added successfully!', 'success');
+  };
+  
+  // Handle edit material
+  const handleEditMaterial = () => {
+    fetchMaterials();
+    showNotification('Raw material updated successfully!', 'success');
+  };
+  
+  // Handle delete material
+  const handleDeleteMaterial = () => {
+    fetchMaterials();
+    setSelected([]);
+    showNotification('Raw material deleted successfully!', 'success');
+  };
+  
+  // Action menu handlers
+  const handleActionMenuOpen = (event, material) => {
+    setActionMenuAnchor(event.currentTarget);
+    setSelectedMaterialForAction(material);
+  };
+
+  const handleActionMenuClose = () => {
+    setActionMenuAnchor(null);
+    setSelectedMaterialForAction(null);
+  };
+
+  // Open edit modal
+  const openEditMaterialModal = (material) => {
+    if (!canUpdate) return;
+    setSelectedMaterial(material);
+    setOpenEditModal(true);
+    handleActionMenuClose();
+  };
+  
+  // Open view modal
+  const openViewMaterialModal = (material) => {
+    if (!canViewPage) return;
+    setSelectedMaterial(material);
+    setOpenViewModal(true);
+    handleActionMenuClose();
+  };
+  
+  // Open delete confirmation
+  const openDeleteMaterialDialog = (material) => {
+    if (!canDelete) return;
+    setSelectedMaterial(material);
+    setOpenDeleteDialog(true);
+    handleActionMenuClose();
+  };
+  
+  // Show notification
+  const showNotification = (message, severity) => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+  
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+  
+  // Get material initials for avatar
+  const getMaterialInitials = (materialName) => {
+    if (!materialName) return 'RM';
+    
+    const words = materialName.split(' ');
+    if (words.length >= 2) {
+      return `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase();
+    }
+    
+    return materialName.substring(0, 2).toUpperCase();
+  };
+  
+  // Get avatar color based on material name
+  const getAvatarColor = (materialName) => {
+    if (!materialName) return COLORS.primary;
+    
+    const colors = [
+      COLORS.primary,
+      COLORS.primaryDark,
+      '#074346',
+      '#0D696C',
+      '#128C7E'
+    ];
+    
+    const charCode = materialName.charCodeAt(0) || 0;
+    return colors[charCode % colors.length];
+  };
+  
+  // Calculate effective rate
+  const calculateEffectiveRate = (rate, scrapPercentage, transportLossPercentage) => {
+    const effectiveRate = rate + (rate * (scrapPercentage + transportLossPercentage) / 100);
+    return Math.round(effectiveRate * 100) / 100;
+  };
+  
+  // Get rate badge color
+  const getRateBadgeColor = (rate) => {
+    if (rate < 100) return 'success';
+    if (rate < 500) return 'info';
+    if (rate < 1000) return 'warning';
+    return 'error';
+  };
+
+  // Show loading state while permissions are being fetched
+  if (!permissionsLoaded) {
+    return <LoadingState />;
+  }
+
+  // If user doesn't have view permission, show access denied
+  if (!canViewPage && !isSuperAdmin) {
+    return <AccessDenied />;
+  }
+
+  return (
+    <Box sx={{ p: 2.5 }}>
+      {/* Page Header */}
+      <Box sx={{ mb: 2.5 }}>
+        <Typography 
+          variant="h5" 
+          component="h1" 
+          sx={{ 
+            fontSize: '1.25rem',
+            fontWeight: 700,
+            color: COLORS.text.primary,
+            mb: 0.5
+          }}
+        >
+          Raw Material Master
+        </Typography>
+        <Typography variant="body2" sx={{ fontSize: '0.75rem', color: COLORS.text.secondary }}>
+          Manage and organize raw material specifications, rates, and cost factors
+        </Typography>
+      </Box>
+
+      {/* Action Bar */}
+      <Paper sx={{ 
+        p: 1.5, 
+        mb: 2.5, 
+        borderRadius: 2,
+        bgcolor: COLORS.background.white,
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+        border: `1px solid ${COLORS.border}`
+      }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center" justifyContent="space-between">
+          {/* Search */}
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1 }}>
+            <TextField
+              placeholder="Search by material name, grade, or rate..."
+              size="small"
+              value={searchInput}
+              onChange={handleSearchChange}
+              autoComplete="off"
+              sx={{ 
+                width: { xs: '100%', sm: 320 },
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 1.5,
+                  fontSize: '0.75rem',
+                  '&:hover fieldset': {
+                    borderColor: COLORS.primary,
+                  },
+                }
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ fontSize: '1rem', color: COLORS.text.tertiary }} />
+                  </InputAdornment>
+                ),
+                sx: { 
+                  height: 36,
+                  bgcolor: COLORS.background.light,
+                  '& input': {
+                    padding: '6px 12px',
+                    fontSize: '0.75rem',
+                    color: COLORS.text.primary,
+                    '&::placeholder': {
+                      color: COLORS.text.tertiary,
+                      fontSize: '0.75rem'
+                    }
+                  }
+                }
+              }}
+            />
+          </Stack>
+
+          {/* Action Buttons - Conditionally rendered based on permissions */}
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {/* Refresh Button */}
+            <Tooltip title="Refresh">
+              <IconButton
+                size="small"
+                onClick={handleRefresh}
+                disabled={loading}
+                sx={{
+                  color: COLORS.text.secondary,
+                  '&:hover': {
+                    bgcolor: `${COLORS.primary}20`
+                  }
+                }}
+              >
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            
+            {/* Bulk Delete Button - Only show if user has delete permission */}
+            {canDelete && selected.length > 0 && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                onClick={handleBulkDelete}
+                sx={{ 
+                  height: 36,
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  borderColor: '#fee2e2',
+                  color: '#991b1b',
+                  '&:hover': {
+                    borderColor: '#fecaca',
+                    bgcolor: '#fee2e2'
+                  }
+                }}
+                disabled={loading}
+              >
+                Delete ({selected.length})
+              </Button>
+            )}
+            
+            {/* Export Button - Only show if user has export permission */}
+            {canExport && (
+              <Button
+                variant="outlined"
+                startIcon={<ExportIcon sx={{ fontSize: '1rem' }} />}
+                onClick={handleExport}
+                sx={{ 
+                  height: 36,
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  borderColor: COLORS.border,
+                  color: COLORS.primary,
+                  '&:hover': {
+                    borderColor: COLORS.primary,
+                    bgcolor: `${COLORS.primary}10`
+                  }
+                }}
+                disabled={loading}
+              >
+                Export
+              </Button>
+            )}
+            
+            {/* Import Button - Only show if user has import permission */}
+            {canImport && (
+              <Button
+                variant="outlined"
+                startIcon={<ImportIcon sx={{ fontSize: '1rem' }} />}
+                onClick={() => setOpenImportDialog(true)}
+                sx={{ 
+                  height: 36,
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  borderColor: COLORS.border,
+                  color: COLORS.primary,
+                  '&:hover': {
+                    borderColor: COLORS.primary,
+                    bgcolor: `${COLORS.primary}10`
+                  }
+                }}
+                disabled={loading}
+              >
+                Import
+              </Button>
+            )}
+            
+            {/* Add Raw Material Button - Only show if user has create permission */}
+            {canCreate && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon sx={{ fontSize: '1rem' }} />}
+                onClick={() => setOpenAddModal(true)}
+                sx={{
+                  height: 36,
+                  borderRadius: 1.5,
+                  bgcolor: COLORS.primary,
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                  '&:hover': {
+                    bgcolor: COLORS.primaryDark,
+                  }
+                }}
+                disabled={loading}
+              >
+                Add Raw Material
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {/* Materials Table */}
+      <Paper sx={{ 
+        width: '100%', 
+        borderRadius: 2, 
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+        border: `1px solid ${COLORS.border}`
+      }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ 
+                bgcolor: COLORS.background.tableHeader,
+                '& .MuiTableCell-root': {
+                  borderBottom: 'none',
+                  color: COLORS.text.light,
+                  py: 1.5
+                }
+              }}>
+                {/* Checkbox Column - Only show if user has delete permission */}
+                {canDelete && (
+                  <TableCell padding="checkbox" sx={{ width: 40 }}>
+                    <Checkbox
+                      indeterminate={selected.length > 0 && selected.length < materials.length}
+                      checked={materials.length > 0 && selected.length === materials.length}
+                      onChange={handleSelectAll}
+                      sx={{
+                        color: COLORS.text.light,
+                        '&.Mui-checked': {
+                          color: COLORS.text.light,
+                        },
+                        '&.MuiCheckbox-indeterminate': {
+                          color: COLORS.text.light,
+                        },
+                        '& .MuiSvgIcon-root': {
+                          fontSize: '1.25rem'
+                        }
+                      }}
+                      disabled={loading || materials.length === 0}
+                    />
+                  </TableCell>
+                )}
+                <TableCell sx={{ 
+                  fontWeight: 600, 
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.5px',
+                  color: COLORS.text.light
+                }}>
+                  Material
+                </TableCell>
+                <TableCell sx={{ 
+                  fontWeight: 600, 
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.5px',
+                  color: COLORS.text.light
+                }}>
+                  Grade
+                </TableCell>
+                <TableCell sx={{ 
+                  fontWeight: 600, 
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.5px',
+                  color: COLORS.text.light
+                }}>
+                  Base Rate (/kg)
+                </TableCell>
+                <TableCell sx={{ 
+                  fontWeight: 600, 
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.5px',
+                  color: COLORS.text.light
+                }}>
+                  Scrap %
+                </TableCell>
+                <TableCell sx={{ 
+                  fontWeight: 600, 
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.5px',
+                  color: COLORS.text.light
+                }}>
+                  Transport Loss %
+                </TableCell>
+                <TableCell sx={{ 
+                  fontWeight: 600, 
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.5px',
+                  color: COLORS.text.light
+                }}>
+                  Effective Rate (/kg)
+                </TableCell>
+                <TableCell sx={{ 
+                  fontWeight: 600, 
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.5px',
+                  width: 60,
+                  color: COLORS.text.light
+                }} align="center">
+                  Actions
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={canDelete ? 9 : 8} align="center" sx={{ py: 6 }}>
+                    <CircularProgress size={32} sx={{ color: COLORS.primary }} />
+                    <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary, mt: 1 }}>
+                      Loading raw materials...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : materials.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={canDelete ? 9 : 8} align="center" sx={{ py: 6 }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="body1" sx={{ fontSize: '0.875rem', color: COLORS.text.secondary, fontWeight: 500 }}>
+                        {searchTerm ? 'No materials found' : 'No raw materials available'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem', color: COLORS.text.tertiary, mt: 0.5 }}>
+                        {searchTerm ? 'Try adjusting your search terms' : 'Add your first raw material to get started'}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                materials.map((material) => {
+                  const isSelected = selected.includes(material._id);
+                  const isActionMenuOpen = Boolean(actionMenuAnchor) && 
+                    selectedMaterialForAction?._id === material._id;
+                  const avatarColor = getAvatarColor(material.MaterialName);
+                  const effectiveRate = calculateEffectiveRate(
+                    material.RatePerKG,
+                    material.ScrapPercentage,
+                    material.TransportLossPercentage
+                  );
+
+                  return (
+                    <TableRow
+                      key={material._id}
+                      hover
+                      selected={isSelected}
+                      sx={{ 
+                        bgcolor: COLORS.background.white,
+                        '&:hover': {
+                          bgcolor: COLORS.background.hover
+                        },
+                        '&.Mui-selected': {
+                          bgcolor: `${COLORS.primary}10`,
+                          '&:hover': {
+                            bgcolor: `${COLORS.primary}20`
+                          }
+                        },
+                        '& .MuiTableCell-root': {
+                          py: 1.5,
+                          fontSize: '0.75rem',
+                          borderColor: COLORS.border
+                        }
+                      }}
+                    >
+                      {/* Checkbox Column - Only show if user has delete permission */}
+                      {canDelete && (
+                        <TableCell padding="checkbox" sx={{ width: 40 }}>
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => handleSelect(material._id)}
+                            sx={{
+                              color: COLORS.primary,
+                              '&.Mui-checked': {
+                                color: COLORS.primary,
+                              },
+                              '& .MuiSvgIcon-root': {
+                                fontSize: '1.25rem'
+                              }
+                            }}
+                          />
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar 
+                            sx={{ 
+                              width: 32, 
+                              height: 32, 
+                              bgcolor: avatarColor,
+                              fontSize: '0.7rem',
+                              fontWeight: 600
+                            }}
+                          >
+                            {getMaterialInitials(material.MaterialName)}
+                          </Avatar>
+                          <Box>
+                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.text.primary }}>
+                              {material.MaterialName}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.tertiary }}>
+                              ID: {material._id.slice(-6)}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={material.Grade}
+                          size="small"
+                          sx={{
+                            bgcolor: '#e0f2fe',
+                            color: '#0369a1',
+                            border: '1px solid #7dd3fc',
+                            fontWeight: 500,
+                            fontSize: '0.65rem',
+                            height: 20
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <MoneyIcon sx={{ fontSize: '0.7rem', color: '#059669' }} />
+                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#059669' }}>
+                            {formatCurrency(material.RatePerKG)}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <PercentIcon sx={{ fontSize: '0.7rem', color: '#92400e' }} />
+                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#92400e' }}>
+                            {material.ScrapPercentage}%
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                          <PercentIcon sx={{ fontSize: '0.7rem', color: '#92400e' }} />
+                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#92400e' }}>
+                            {material.TransportLossPercentage}%
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={formatCurrency(effectiveRate)}
+                          size="small"
+                          color={getRateBadgeColor(effectiveRate)}
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: '0.65rem',
+                            height: 20,
+                            '& .MuiChip-label': {
+                              px: 1
+                            }
+                          }}
+                        />
+                        <Typography sx={{ fontSize: '0.6rem', color: COLORS.text.tertiary, mt: 0.5 }}>
+                          +{(material.ScrapPercentage + material.TransportLossPercentage).toFixed(1)}%
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center" sx={{ width: 60 }}>
+                        <ActionMenu 
+                          item={material}
+                          onView={openViewMaterialModal}
+                          onEdit={openEditMaterialModal}
+                          onDelete={openDeleteMaterialDialog}
+                          anchorEl={isActionMenuOpen ? actionMenuAnchor : null}
+                          onClose={handleActionMenuClose}
+                          onOpen={(e) => handleActionMenuOpen(e, material)}
+                          permissions={userPermissions}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {/* Pagination */}
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          component="div"
+          count={totalItems}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          sx={{
+            borderTop: `1px solid ${COLORS.border}`,
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+              fontSize: '0.7rem',
+              color: COLORS.text.secondary
+            },
+            '& .MuiTablePagination-select': {
+              fontSize: '0.7rem'
+            },
+            '& .MuiTablePagination-actions button': {
+              color: COLORS.primary,
+            }
+          }}
+        />
+      </Paper>
+
+      {/* Import Dialog */}
+      <Dialog 
+        open={openImportDialog} 
+        onClose={() => !importLoading && setOpenImportDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            border: `1px solid ${COLORS.border}`
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          borderBottom: `1px solid ${COLORS.border}`,
+          pb: 2,
+          fontSize: '1rem',
+          fontWeight: 600,
+          color: COLORS.text.primary
+        }}>
+          Import Raw Materials
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Stack spacing={2}>
+            {/* Template Download Section */}
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: COLORS.background.light, 
+              borderRadius: 2,
+              border: `1px solid ${COLORS.border}`
+            }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.75rem' }}>
+                Step 1: Download Template
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1.5, fontSize: '0.7rem', color: COLORS.text.secondary }}>
+                Download the CSV template and fill it with your data. Make sure to follow the format exactly.
+              </Typography>
+              <Button
+                variant="outlined"
+                onClick={handleDownloadTemplate}
+                size="small"
+                sx={{
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  fontSize: '0.7rem',
+                  borderColor: COLORS.primary,
+                  color: COLORS.primary,
+                  '&:hover': {
+                    borderColor: COLORS.primaryDark,
+                    bgcolor: `${COLORS.primary}10`
+                  }
+                }}
+              >
+                Download CSV Template
+              </Button>
+            </Box>
+
+            {/* File Upload Section */}
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: COLORS.background.light, 
+              borderRadius: 2,
+              border: `1px solid ${COLORS.border}`
+            }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.75rem' }}>
+                Step 2: Upload CSV File
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 1.5, fontSize: '0.7rem', color: COLORS.text.secondary }}>
+                Upload your completed CSV file. Only CSV format is supported.
+              </Typography>
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<UploadIcon sx={{ fontSize: '1rem' }} />}
+                size="small"
+                sx={{
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  fontSize: '0.7rem',
+                  borderColor: COLORS.border,
+                  color: COLORS.primary,
+                  '&:hover': {
+                    borderColor: COLORS.primary,
+                    bgcolor: `${COLORS.primary}10`
+                  }
+                }}
+              >
+                Choose File
+                <input
+                  type="file"
+                  hidden
+                  accept=".csv"
+                  onChange={handleFileSelect}
+                  ref={fileInputRef}
+                  disabled={importLoading}
+                />
+              </Button>
+              {importFile && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
+                    Selected file: <strong>{importFile.name}</strong> ({(importFile.size / 1024).toFixed(2)} KB)
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Import Progress */}
+            {importLoading && (
+              <Box sx={{ width: '100%' }}>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={importProgress} 
+                  sx={{ 
+                    height: 6, 
+                    borderRadius: 3,
+                    bgcolor: COLORS.border,
+                    '& .MuiLinearProgress-bar': {
+                      bgcolor: COLORS.primary,
+                      borderRadius: 3
+                    }
+                  }}
+                />
+                <Typography variant="caption" sx={{ mt: 0.5, fontSize: '0.65rem', color: COLORS.text.secondary, display: 'block' }}>
+                  Importing... {importProgress}%
+                </Typography>
+              </Box>
+            )}
+
+            {/* Important Notes */}
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: '#FFF3E0', 
+              borderRadius: 2,
+              border: '1px solid #FFE0B2'
+            }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.7rem', color: '#E65100' }}>
+                Important Notes:
+              </Typography>
+              <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                <li style={{ fontSize: '0.65rem', color: '#BF360C', marginBottom: '4px' }}>
+                  File must be in CSV format (.csv)
+                </li>
+                <li style={{ fontSize: '0.65rem', color: '#BF360C', marginBottom: '4px' }}>
+                  Do not modify the column headers in the template
+                </li>
+                <li style={{ fontSize: '0.65rem', color: '#BF360C', marginBottom: '4px' }}>
+                  All fields marked with * are required
+                </li>
+                <li style={{ fontSize: '0.65rem', color: '#BF360C' }}>
+                  Maximum file size: 10MB
+                </li>
+              </ul>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ 
+          borderTop: `1px solid ${COLORS.border}`,
+          p: 2,
+          gap: 1
+        }}>
+          <Button 
+            onClick={() => {
+              setOpenImportDialog(false);
+              setImportFile(null);
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+            }}
+            disabled={importLoading}
+            sx={{
+              borderRadius: 1.5,
+              textTransform: 'none',
+              fontSize: '0.7rem',
+              color: COLORS.text.secondary
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleImport}
+            variant="contained"
+            disabled={!importFile || importLoading}
+            sx={{
+              borderRadius: 1.5,
+              textTransform: 'none',
+              fontSize: '0.7rem',
+              bgcolor: COLORS.primary,
+              '&:hover': {
+                bgcolor: COLORS.primaryDark,
+              },
+              '&.Mui-disabled': {
+                bgcolor: COLORS.border,
+                color: COLORS.text.tertiary
+              }
+            }}
+          >
+            {importLoading ? 'Importing...' : 'Import Data'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Components - Only render modals if user has appropriate permissions */}
+      {canCreate && (
+        <AddRawMaterial 
+          open={openAddModal}
+          onClose={() => setOpenAddModal(false)}
+          onAdd={handleAddMaterial}
+        />
+      )}
+
+      {selectedMaterial && (
+        <>
+          {canUpdate && (
+            <EditRawMaterial 
+              open={openEditModal}
+              onClose={() => {
+                setOpenEditModal(false);
+                setSelectedMaterial(null);
+              }}
+              material={selectedMaterial}
+              onUpdate={handleEditMaterial}
+            />
+          )}
+
+          {canViewPage && (
+            <ViewRawMaterial 
+              open={openViewModal}
+              onClose={() => {
+                setOpenViewModal(false);
+                setSelectedMaterial(null);
+              }}
+              material={selectedMaterial}
+              onEdit={() => {
+                if (canUpdate) {
+                  setOpenViewModal(false);
+                  setOpenEditModal(true);
+                }
+              }}
+            />
+          )}
+
+          {canDelete && (
+            <DeleteRawMaterial 
+              open={openDeleteDialog}
+              onClose={() => {
+                setOpenDeleteDialog(false);
+                setSelectedMaterial(null);
+              }}
+              material={selectedMaterial}
+              onDelete={handleDeleteMaterial}
+            />
+          )}
+        </>
+      )}
+
+      {/* Snackbar Notification */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({...snackbar, open: false})}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({...snackbar, open: false})} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ 
+            width: '100%',
+            borderRadius: 1.5,
+            fontSize: '0.75rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            '& .MuiAlert-icon': {
+              fontSize: '1.25rem'
+            }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default RawMaterialMaster;

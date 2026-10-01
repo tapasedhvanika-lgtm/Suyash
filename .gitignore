@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+
+# Build output
+dist/
+build/
+.vite/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+
+# Old build archives
+*.zip
+
+# Backend generated uploads
+Backend/suyash-enterprises/uploads/
+
+# Cache
+.cache/
+# Generated backend files
+Backend/suyash-enterprises/uploads/
+Backend/suyash-enterprises/temp/
+
+# Separate Git project
+Backend/suyash-enterprises/models/CRM/suyash-devita(current)/Suyash-Devita(Current)/S_001/
+
+# Generated documents
+Backend/suyash-enterprises/controllers/uploads/
+
+# Old build/document files
+Frontend/11 Aug suyash build
+Frontend/*.pdf

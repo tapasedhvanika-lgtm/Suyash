@@ -1,0 +1,912 @@
+'use strict';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead,
+  TableRow, IconButton, Button, TextField, InputAdornment, Tooltip,
+  Typography, Snackbar, TablePagination, Checkbox, Stack, Chip,
+  Avatar, Menu, MenuItem, ListItemIcon, ListItemText, Divider,
+  Alert, CircularProgress
+} from '@mui/material';
+import {
+  Search as SearchIcon, Add as AddIcon, Delete as DeleteIcon,
+  Visibility as ViewIcon, Edit as EditIcon, MoreVert as MoreVertIcon,
+  Business as BusinessIcon, Update as UpdateIcon, Message as MessageIcon,
+  Image as ImageIcon, Science as ScienceIcon, Assessment as AssessmentIcon,
+  CheckCircle as CheckCircleIcon, Refresh as RefreshIcon
+} from '@mui/icons-material';
+import axios from 'axios';
+import BASE_URL from '../../../config/Config';
+import AddLead from './AddLead';
+import EditLead from './EditLead';
+import ViewLead from './ViewLead';
+import DeleteLead from './DeleteLead';
+import StatusUpdatePopup from './StatusUpdatePopup';
+import ConvertLeadPopup from './ConvertLeadPopup';
+import FollowupPopup from './FollowupPopup';
+import DrawingsPopup from './DrawingsPopup';
+import FeasibilityPopup from './FeasibilityPopup';
+import FeasibilityCheckPopup from './FeasibilityCheckPopup';
+import { COLORS, STATUS_COLORS, PRIORITY_COLORS, STATUS_TRANSITIONS } from './constants';
+import { hasPermission, ACTIONS, MODULES, PAGES } from '../../../utils/modulePermissions';
+
+// ─── terminal statuses per backend state machine ──────────────────────────────
+const TERMINAL_STATUSES = ['Won', 'Lost', 'Junk'];
+
+// Loading state component
+const LoadingState = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+    <CircularProgress size={40} sx={{ color: COLORS.primary }} />
+  </Box>
+);
+
+// Access Denied component
+const AccessDenied = () => (
+  <Box sx={{ p: 4, textAlign: 'center' }}>
+    <Typography variant="h6" color="error" sx={{ mb: 2 }}>
+      Access Denied
+    </Typography>
+    <Typography variant="body2" color="text.secondary">
+      You don't have permission to view this page. Please contact your administrator.
+    </Typography>
+  </Box>
+);
+
+// Helper function to get feasibility status color
+const getFeasibilityStatusColor = (status) => {
+  if (!status || status === '') return { bg: '#F1F5F9', color: '#64748B', border: '#E2E8F0' };
+  switch(status.toLowerCase()) {
+    case 'feasible':
+      return { bg: '#DCFCE7', color: '#166534', border: '#86EFAC' };
+    case 'not feasible':
+      return { bg: '#FEE2E2', color: '#991B1B', border: '#FECACA' };
+    case 'partial':
+      return { bg: '#FEF3C7', color: '#92400E', border: '#FDE68A' };
+    case 'under review':
+      return { bg: '#DBEAFE', color: '#1E40AF', border: '#BFDBFE' };
+    default:
+      return { bg: '#F1F5F9', color: '#64748B', border: '#E2E8F0' };
+  }
+};
+
+// ─── Action Menu with permission checks - USING CORRECT MODULE CONSTANTS ─────
+const ActionMenu = ({
+  item, anchorEl, onOpen, onClose,
+  onView, onEdit, onDelete, onStatusUpdate,
+  onConvert, onFollowup, onDrawings, onFeasibility, onFeasibilityCheck,
+  permissions, isSuperAdmin
+}) => {
+  // ✅ FIXED: Use MODULES.LEAD_MASTER and PAGES.LEAD_MASTER
+  const canView = isSuperAdmin || hasPermission(permissions, MODULES.LEAD_MASTER, PAGES.LEAD_MASTER, ACTIONS.VIEW);
+  const canUpdate = isSuperAdmin || hasPermission(permissions, MODULES.LEAD_MASTER, PAGES.LEAD_MASTER, ACTIONS.UPDATE);
+  const canDelete = isSuperAdmin || hasPermission(permissions, MODULES.LEAD_MASTER, PAGES.LEAD_MASTER, ACTIONS.DELETE);
+  const canCreate = isSuperAdmin || hasPermission(permissions, MODULES.LEAD_MASTER, PAGES.LEAD_MASTER, ACTIONS.CREATE);
+  
+  // Feature-specific permissions (using same UPDATE permission for status/features)
+  const canUpdateStatus = canUpdate;
+  const canConvert = canUpdate && item?.status === 'Won' && !item?.is_converted;
+  const canAddFollowup = canUpdate;
+  const canManageDrawings = canUpdate;
+  const canManageFeasibility = canUpdate;
+  const canFeasibilityCheck = canUpdate;
+
+  const currentStatus = item?.status || 'New';
+  const isTerminal = TERMINAL_STATUSES.includes(currentStatus);
+  const hasNextTransitions = (STATUS_TRANSITIONS[currentStatus] || []).length > 0;
+  const isConverted = currentStatus === 'Won' && item?.is_converted;
+  const hasEnquiredItems = (item?.enquired_items?.length || 0) > 0;
+
+  // Check if any actions are available
+  const hasAnyAction = canView || canUpdate || canDelete || canCreate;
+  if (!hasAnyAction) return null;
+
+  const menuItem = (onClick, icon, label, color = COLORS.text.primary, disabled = false, tooltipMsg = '') => {
+    const el = (
+      <MenuItem
+        onClick={() => { if (!disabled) { onClick(); onClose(); } }}
+        sx={{
+          py: 1.5,
+          opacity: disabled ? 0.4 : 1,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          pointerEvents: disabled ? 'none' : 'auto',
+        }}
+      >
+        <ListItemIcon sx={{ color, minWidth: 36 }}>{icon}</ListItemIcon>
+        <ListItemText>
+          <Typography variant="body2" fontWeight={500} sx={{ color, fontSize: '0.75rem' }}>
+            {label}
+          </Typography>
+        </ListItemText>
+      </MenuItem>
+    );
+    return disabled && tooltipMsg
+      ? <Tooltip key={label} title={tooltipMsg} placement="left">{el}</Tooltip>
+      : <React.Fragment key={label}>{el}</React.Fragment>;
+  };
+
+  return (
+    <>
+      <Tooltip title="Actions">
+        <IconButton
+          size="small"
+          onClick={onOpen}
+          sx={{ color: COLORS.text.secondary, '&:hover': { bgcolor: `${COLORS.primary}20` } }}
+        >
+          <MoreVertIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={onClose}
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            mt: 1, minWidth: 200, borderRadius: 2,
+            border: `1px solid ${COLORS.border}`,
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+          },
+        }}
+      >
+        {canView && menuItem(() => onView(item), <ViewIcon fontSize="small" />, 'View details')}
+        
+        {canUpdate && menuItem(
+          () => onEdit(item),
+          <EditIcon fontSize="small" />,
+          'Edit',
+          isTerminal ? COLORS.text.tertiary : COLORS.text.primary,
+          isTerminal,
+          `Lead is ${currentStatus} — editing is disabled`
+        )}
+
+        <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />
+
+        {canFeasibilityCheck && menuItem(
+          () => onFeasibilityCheck(item),
+          <AssessmentIcon fontSize="small" />,
+          'Feasibility check',
+          hasEnquiredItems ? '#8B5CF6' : COLORS.text.tertiary,
+          !hasEnquiredItems,
+          'Add enquired items first before running feasibility check'
+        )}
+        
+        {canManageFeasibility && menuItem(
+          () => onFeasibility(item),
+          <ScienceIcon fontSize="small" />,
+          'Submit feasibility',
+          hasEnquiredItems ? '#06B6D4' : COLORS.text.tertiary,
+          !hasEnquiredItems,
+          'Add enquired items first'
+        )}
+        
+        {canManageDrawings && menuItem(() => onDrawings(item), <ImageIcon fontSize="small" />, 'Drawings', '#8B5CF6')}
+        
+        {canAddFollowup && menuItem(
+          () => onFollowup(item),
+          <MessageIcon fontSize="small" />,
+          'Add follow-up',
+          isTerminal ? COLORS.text.tertiary : '#10B981',
+          isTerminal,
+          `Lead is ${currentStatus} — no follow-ups on closed leads`
+        )}
+
+        <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />
+
+        {canUpdateStatus && hasNextTransitions && menuItem(
+          () => onStatusUpdate(item),
+          <UpdateIcon fontSize="small" />,
+          'Update status',
+          COLORS.primary
+        )}
+
+        {/* Convert to customer - only if Won and NOT yet converted */}
+        {canConvert && menuItem(
+          () => onConvert(item),
+          <BusinessIcon fontSize="small" />,
+          'Convert to customer',
+          '#10B981'
+        )}
+
+        {/* Show "already converted" badge instead of button */}
+        {isConverted && (
+          <MenuItem disabled sx={{ py: 1.5, opacity: 0.6 }}>
+            <ListItemIcon sx={{ color: '#10B981', minWidth: 36 }}>
+              <CheckCircleIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              <Typography variant="body2" fontWeight={500} sx={{ color: '#10B981', fontSize: '0.75rem' }}>
+                Already converted
+              </Typography>
+            </ListItemText>
+          </MenuItem>
+        )}
+
+        <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />
+
+        {canDelete && menuItem(() => onDelete(item), <DeleteIcon fontSize="small" />, 'Delete', '#EF4444')}
+      </Menu>
+    </>
+  );
+};
+
+// ─── Main component ───────────────────────────────────────────────────────────
+const LeadsMaster = () => {
+  const [leads, setLeads] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selected, setSelected] = useState([]);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
+  const [selectedLeadForMenu, setSelectedLeadForMenu] = useState(null);
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  // User permissions state
+  const [userPermissions, setUserPermissions] = useState([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+
+  // modal open states
+  const [openAdd, setOpenAdd] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [openView, setOpenView] = useState(false);
+  const [openDelete, setOpenDelete] = useState(false);
+  const [openStatus, setOpenStatus] = useState(false);
+  const [openConvert, setOpenConvert] = useState(false);
+  const [openFollowup, setOpenFollowup] = useState(false);
+  const [openDrawings, setOpenDrawings] = useState(false);
+  const [openFeasibility, setOpenFeasibility] = useState(false);
+  const [openFeasibilityCheck, setOpenFeasibilityCheck] = useState(false);
+
+  // Ref to track if we're currently searching (typing)
+  const isSearchingRef = useRef(false);
+  const searchTimeoutRef = useRef(null);
+
+  // Fetch user permissions
+  useEffect(() => {
+    const fetchUserPermissions = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${BASE_URL}/api/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.data.success) {
+          const userData = response.data.data;
+          setIsSuperAdmin(userData.isSuperAdmin || false);
+          setUserPermissions(userData.permissions || []);
+        }
+      } catch (err) {
+        console.error('Error fetching user permissions:', err);
+        setUserPermissions([]);
+      } finally {
+        setPermissionsLoaded(true);
+      }
+    };
+
+    fetchUserPermissions();
+  }, []);
+
+  // Check permission helper - ✅ FIXED: Use MODULES.LEAD_MASTER and PAGES.LEAD_MASTER
+  const checkPermission = (action) => {
+    if (isSuperAdmin) return true;
+    return hasPermission(userPermissions, MODULES.LEAD_MASTER, PAGES.LEAD_MASTER, action);
+  };
+
+  // Permission checks
+  const canViewPage = checkPermission(ACTIONS.VIEW);
+  const canCreate = checkPermission(ACTIONS.CREATE);
+  const canUpdate = checkPermission(ACTIONS.UPDATE);
+  const canDelete = checkPermission(ACTIONS.DELETE);
+
+  // Handle search input change with proper debounce
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    isSearchingRef.current = true;
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for debounce
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+      setPage(0);
+      setSelected([]);
+      isSearchingRef.current = false;
+    }, 500);
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setSearchTerm('');
+    setCurrentPage(1);
+    setPage(0);
+    setSelected([]);
+    isSearchingRef.current = false;
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle refresh
+  const handleRefresh = () => {
+    fetchLeads();
+    notify('Data refreshed', 'success');
+  };
+
+  // ── fetch leads ──────────────────────────────────────────────────────────
+  const fetchLeads = useCallback(async () => {
+    if (!canViewPage && !isSuperAdmin) return;
+    
+    // Don't show loading indicator while typing search
+    if (!isSearchingRef.current) {
+      setLoading(true);
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({ 
+        page: currentPage, 
+        limit: rowsPerPage 
+      });
+      if (searchTerm) params.append('search', searchTerm);
+
+      const res = await axios.get(`${BASE_URL}/api/leads?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.data.success) {
+        setLeads(res.data.data || []);
+        setTotalItems(res.data.pagination?.total || 0);
+      } else {
+        notify('Failed to load leads', 'error');
+      }
+    } catch {
+      notify('Failed to load leads', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, rowsPerPage, searchTerm, canViewPage, isSuperAdmin]);
+
+  useEffect(() => {
+    if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
+      fetchLeads();
+    }
+  }, [fetchLeads, permissionsLoaded, canViewPage, isSuperAdmin]);
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+  const notify = (message, severity = 'success') =>
+    setSnackbar({ open: true, message, severity });
+
+  const openModal = (setter, lead = null) => {
+    if (lead) setSelectedLead(lead);
+    setter(true);
+    setActionMenuAnchor(null);
+    setSelectedLeadForMenu(null);
+  };
+
+  const closeModal = (setter) => {
+    setter(false);
+    setSelectedLead(null);
+  };
+
+  const afterAction = (setter, message) => () => {
+    closeModal(setter);
+    fetchLeads();
+    notify(message);
+  };
+
+  // ── selection (only if delete permission) ────────────────────────────────
+  const handleSelectAll = (e) => {
+    if (!canDelete) return;
+    setSelected(e.target.checked ? leads.map(l => l._id) : []);
+  };
+
+  const handleSelect = (id) => {
+    if (!canDelete) return;
+    setSelected(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  // ── bulk delete ──────────────────────────────────────────────────────────
+  const handleBulkDelete = async () => {
+    if (!canDelete || selected.length === 0) return;
+    
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${BASE_URL}/api/leads/bulk-delete`, 
+        { ids: selected },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSelected([]);
+      
+      if (leads.length === selected.length && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+        setPage(prev => prev - 1);
+      } else {
+        fetchLeads();
+      }
+      
+      notify(`${selected.length} lead(s) deleted successfully!`);
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      notify('Failed to delete leads', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── pagination ───────────────────────────────────────────────────────────
+  const handleChangePage = (_, newPage) => { 
+    setPage(newPage); 
+    setCurrentPage(newPage + 1);
+    setSelected([]); 
+  };
+  
+  const handleChangeRows = (e) => {
+    setRowsPerPage(parseInt(e.target.value, 10));
+    setPage(0);
+    setCurrentPage(1);
+    setSelected([]);
+  };
+
+  // ── formatting ───────────────────────────────────────────────────────────
+  const formatDate = (d) =>
+    d ? new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+
+  const getInitials = (lead) =>
+    lead.company_name ? lead.company_name.substring(0, 2).toUpperCase() : 'LD';
+
+  const getAvatarColor = (lead) => {
+    const colors = [COLORS.primary, COLORS.primaryDark, '#074346', '#0D696C', '#128C7E'];
+    return colors[(lead.company_name?.charCodeAt(0) || 0) % colors.length];
+  };
+
+  // Show loading state while permissions are being fetched
+  if (!permissionsLoaded) {
+    return <LoadingState />;
+  }
+
+  // If user doesn't have view permission, show access denied
+  if (!canViewPage && !isSuperAdmin) {
+    return <AccessDenied />;
+  }
+
+  // ── render ───────────────────────────────────────────────────────────────
+  return (
+    <Box sx={{ p: 2.5 }}>
+      {/* Header */}
+      <Box sx={{ mb: 2.5 }}>
+        <Typography variant="h5" sx={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.text.primary, mb: 0.5 }}>
+          Leads Master
+        </Typography>
+        <Typography variant="body2" sx={{ fontSize: '0.75rem', color: COLORS.text.secondary }}>
+          Manage leads, track status, and follow up with potential customers
+        </Typography>
+      </Box>
+
+      {/* Action bar */}
+      <Paper sx={{ p: 1.5, mb: 2.5, borderRadius: 2, bgcolor: COLORS.background.white, border: `1px solid ${COLORS.border}`, boxShadow: '0 1px 3px 0 rgba(0,0,0,0.05)' }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center" justifyContent="space-between">
+          <TextField
+            placeholder="Search by company, contact, subject, lead ID..."
+            size="small"
+            value={searchInput}
+            onChange={handleSearchChange}
+            autoComplete="off"
+            sx={{
+              width: { xs: '100%', sm: 450 },
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 1.5, fontSize: '0.75rem',
+                '&:hover fieldset': { borderColor: COLORS.primary },
+              },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: '1rem', color: COLORS.text.tertiary }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchInput && (
+                <InputAdornment position="end">
+                 
+                </InputAdornment>
+              ),
+              sx: {
+                height: 36, bgcolor: COLORS.background.light,
+                '& input': { padding: '6px 12px', fontSize: '0.75rem', color: COLORS.text.primary },
+              },
+            }}
+          />
+
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {/* Refresh Button */}
+            <Tooltip title="Refresh">
+              <IconButton
+                size="small"
+                onClick={handleRefresh}
+                disabled={loading}
+                sx={{ color: COLORS.text.secondary, '&:hover': { bgcolor: `${COLORS.primary}20` } }}
+              >
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            {/* Bulk Delete Button - Only if delete permission */}
+            {canDelete && selected.length > 0 && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                onClick={handleBulkDelete}
+                sx={{
+                  height: 36, borderRadius: 1.5, textTransform: 'none',
+                  fontSize: '0.75rem', fontWeight: 500,
+                  borderColor: '#fee2e2', color: '#991b1b',
+                  '&:hover': { borderColor: '#fecaca', bgcolor: '#fee2e2' }
+                }}
+                disabled={loading}
+              >
+                Delete ({selected.length})
+              </Button>
+            )}
+            
+            {/* Add Lead Button - Only if create permission */}
+            {canCreate && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon sx={{ fontSize: '1rem' }} />}
+                onClick={() => setOpenAdd(true)}
+                sx={{
+                  height: 36, borderRadius: 1.5, bgcolor: COLORS.primary,
+                  fontSize: '0.75rem', fontWeight: 500, textTransform: 'none',
+                  '&:hover': { bgcolor: COLORS.primaryDark },
+                }}
+                disabled={loading}
+              >
+                Add Lead
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {/* Table */}
+      <Paper sx={{ width: '100%', borderRadius: 2, overflow: 'hidden', border: `1px solid ${COLORS.border}`, boxShadow: '0 1px 3px 0 rgba(0,0,0,0.05)' }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: COLORS.background.tableHeader, '& .MuiTableCell-root': { borderBottom: 'none', color: COLORS.text.light, py: 1.5 } }}>
+                {/* Checkbox Column - Only if delete permission */}
+                {canDelete && (
+                  <TableCell padding="checkbox" sx={{ width: 40 }}>
+                    <Checkbox
+                      indeterminate={selected.length > 0 && selected.length < leads.length}
+                      checked={leads.length > 0 && selected.length === leads.length}
+                      onChange={handleSelectAll}
+                      disabled={loading || leads.length === 0}
+                      sx={{ color: COLORS.text.light, '&.Mui-checked': { color: COLORS.text.light }, '&.MuiCheckbox-indeterminate': { color: COLORS.text.light }, '& .MuiSvgIcon-root': { fontSize: '1.25rem' } }}
+                    />
+                  </TableCell>
+                )}
+                {[
+                  'Lead ID / Company', 
+                  'Subject', 
+                  'Contact', 
+                  'Status', 
+                  'Priority', 
+                  'Feasibility Status', 
+                  'Est. Value', 
+                  'Created', 
+                  'Actions'
+                ].map(h => (
+                  <TableCell key={h} align={h === 'Actions' ? 'center' : 'left'} sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', width: h === 'Actions' ? 60 : 'auto' }}>
+                    {h}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={canDelete ? 10 : 9} align="center" sx={{ py: 6 }}>
+                    <CircularProgress size={32} sx={{ color: COLORS.primary }} />
+                    <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary, mt: 1 }}>Loading leads...</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : leads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={canDelete ? 10 : 9} align="center" sx={{ py: 6 }}>
+                    <BusinessIcon sx={{ fontSize: 48, color: COLORS.text.tertiary, mb: 1 }} />
+                    <Typography sx={{ fontSize: '0.875rem', color: COLORS.text.secondary, fontWeight: 500 }}>
+                      {searchTerm ? 'No leads found' : 'No leads available'}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.tertiary, mt: 0.5 }}>
+                      {searchTerm ? 'Try adjusting your search terms' : 'Add your first lead to get started'}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : leads.map((lead) => {
+                const isSelected = selected.includes(lead._id);
+                const menuOpen = Boolean(actionMenuAnchor) && selectedLeadForMenu?._id === lead._id;
+                const statusColors = STATUS_COLORS[lead.status] || { bg: '#F1F5F9', color: '#475569', border: '#E2E8F0' };
+                const priorityColors = PRIORITY_COLORS[lead.priority] || { bg: '#F1F5F9', color: '#475569' };
+                const isTerminal = TERMINAL_STATUSES.includes(lead.status);
+                const feasibilityStatus = lead.feasibility_status && lead.feasibility_status !== '' 
+                  ? lead.feasibility_status 
+                  : 'N/A';
+                const feasibilityColors = getFeasibilityStatusColor(lead.feasibility_status);
+
+                return (
+                  <TableRow
+                    key={lead._id}
+                    hover
+                    selected={isSelected}
+                    sx={{
+                      bgcolor: COLORS.background.white,
+                      opacity: isTerminal ? 0.85 : 1,
+                      '&:hover': { bgcolor: COLORS.background.hover },
+                      '&.Mui-selected': { bgcolor: `${COLORS.primary}10`, '&:hover': { bgcolor: `${COLORS.primary}20` } },
+                      '& .MuiTableCell-root': { py: 1.5, fontSize: '0.75rem', borderColor: COLORS.border },
+                    }}
+                  >
+                    {/* Checkbox Column - Only if delete permission */}
+                    {canDelete && (
+                      <TableCell padding="checkbox" sx={{ width: 40 }}>
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={() => handleSelect(lead._id)}
+                          sx={{ color: COLORS.primary, '&.Mui-checked': { color: COLORS.primary }, '& .MuiSvgIcon-root': { fontSize: '1.25rem' } }}
+                        />
+                      </TableCell>
+                    )}
+
+                    <TableCell>
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: getAvatarColor(lead), fontSize: '0.7rem', fontWeight: 600 }}>
+                          {getInitials(lead)}
+                        </Avatar>
+                        <Box>
+                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.text.primary }}>
+                            {lead.company_name}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.tertiary }}>
+                            {lead.lead_id}
+                            {lead.is_converted && (
+                              <Chip label="Converted" size="small" sx={{ ml: 0.5, height: 14, fontSize: '0.55rem', bgcolor: '#E1F5EE', color: '#085041', border: '1px solid #9FE1CB' }} />
+                            )}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: COLORS.text.primary }}>{lead.subject}</Typography>
+                      {lead.lead_source && (
+                        <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.tertiary }}>
+                          {lead.lead_source}{lead.lead_source_detail ? ` (${lead.lead_source_detail})` : ''}
+                        </Typography>
+                      )}
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>{lead.contact_name}</Typography>
+                      {lead.contact_mobile && (
+                        <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.tertiary }}>{lead.contact_mobile}</Typography>
+                      )}
+                    </TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={lead.status || 'New'}
+                        size="small"
+                        sx={{ fontSize: '0.65rem', fontWeight: 500, height: 24, bgcolor: statusColors.bg, color: statusColors.color, border: `1px solid ${statusColors.border}` }}
+                      />
+                    </TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={lead.priority || 'Medium'}
+                        size="small"
+                        sx={{ fontSize: '0.65rem', fontWeight: 500, height: 24, bgcolor: priorityColors.bg, color: priorityColors.color }}
+                      />
+                    </TableCell>
+
+                    {/* New Feasibility Status Column */}
+                    <TableCell>
+                      {feasibilityStatus === 'N/A' ? (
+                        <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.tertiary, fontStyle: 'italic' }}>
+                          N/A
+                        </Typography>
+                      ) : (
+                        <Chip
+                          label={feasibilityStatus}
+                          size="small"
+                          sx={{ 
+                            fontSize: '0.65rem', 
+                            fontWeight: 500, 
+                            height: 24, 
+                            bgcolor: feasibilityColors.bg, 
+                            color: feasibilityColors.color, 
+                            border: `1px solid ${feasibilityColors.border}` 
+                          }}
+                        />
+                      )}
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                        {lead.estimated_value ? `₹${lead.estimated_value.toLocaleString('en-IN')}` : '—'}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>
+                        {formatDate(lead.createdAt)}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell align="center" sx={{ width: 60 }}>
+                      <ActionMenu
+                        item={lead}
+                        anchorEl={menuOpen ? actionMenuAnchor : null}
+                        onOpen={(e) => { setActionMenuAnchor(e.currentTarget); setSelectedLeadForMenu(lead); }}
+                        onClose={() => { setActionMenuAnchor(null); setSelectedLeadForMenu(null); }}
+                        onView={(l) => openModal(setOpenView, l)}
+                        onEdit={(l) => openModal(setOpenEdit, l)}
+                        onDelete={(l) => openModal(setOpenDelete, l)}
+                        onStatusUpdate={(l) => openModal(setOpenStatus, l)}
+                        onConvert={(l) => openModal(setOpenConvert, l)}
+                        onFollowup={(l) => openModal(setOpenFollowup, l)}
+                        onDrawings={(l) => openModal(setOpenDrawings, l)}
+                        onFeasibility={(l) => openModal(setOpenFeasibility, l)}
+                        onFeasibilityCheck={(l) => openModal(setOpenFeasibilityCheck, l)}
+                        permissions={userPermissions}
+                        isSuperAdmin={isSuperAdmin}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          component="div"
+          count={totalItems}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRows}
+          sx={{
+            borderTop: `1px solid ${COLORS.border}`,
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: '0.7rem', color: COLORS.text.secondary },
+            '& .MuiTablePagination-select': { fontSize: '0.7rem' },
+            '& .MuiTablePagination-actions button': { color: COLORS.primary },
+          }}
+        />
+      </Paper>
+
+      {/* ── Modals (conditionally rendered based on permissions) ── */}
+      {canCreate && (
+        <AddLead 
+          open={openAdd} 
+          onClose={() => setOpenAdd(false)} 
+          onAdd={() => { setOpenAdd(false); fetchLeads(); notify('Lead added successfully!'); }} 
+        />
+      )}
+
+      {selectedLead && (
+        <>
+          {canUpdate && (
+            <>
+              <EditLead
+                open={openEdit}
+                onClose={() => closeModal(setOpenEdit)}
+                lead={selectedLead}
+                onUpdate={afterAction(setOpenEdit, 'Lead updated successfully!')}
+              />
+              <StatusUpdatePopup
+                open={openStatus}
+                onClose={() => closeModal(setOpenStatus)}
+                lead={selectedLead}
+                onStatusUpdate={afterAction(setOpenStatus, 'Status updated successfully!')}
+              />
+              <ConvertLeadPopup
+                open={openConvert}
+                onClose={() => closeModal(setOpenConvert)}
+                lead={selectedLead}
+                onConvert={afterAction(setOpenConvert, 'Lead converted to customer successfully!')}
+              />
+              <FollowupPopup
+                open={openFollowup}
+                onClose={() => closeModal(setOpenFollowup)}
+                lead={selectedLead}
+                onFollowup={afterAction(setOpenFollowup, 'Follow-up added successfully!')}
+              />
+              <DrawingsPopup
+                open={openDrawings}
+                onClose={() => closeModal(setOpenDrawings)}
+                lead={selectedLead}
+                onDrawingUpload={afterAction(setOpenDrawings, 'Drawing uploaded successfully!')}
+              />
+              <FeasibilityPopup
+                open={openFeasibility}
+                onClose={() => closeModal(setOpenFeasibility)}
+                lead={selectedLead}
+                onFeasibilityUpdate={afterAction(setOpenFeasibility, 'Feasibility updated successfully!')}
+              />
+              <FeasibilityCheckPopup
+                open={openFeasibilityCheck}
+                onClose={() => closeModal(setOpenFeasibilityCheck)}
+                lead={selectedLead}
+              />
+            </>
+          )}
+
+          {canViewPage && (
+            <ViewLead
+              open={openView}
+              onClose={() => closeModal(setOpenView)}
+              lead={selectedLead}
+              onEdit={() => { 
+                if (canUpdate) {
+                  setOpenView(false); 
+                  setOpenEdit(true);
+                }
+              }}
+            />
+          )}
+
+          {canDelete && (
+            <DeleteLead
+              open={openDelete}
+              onClose={() => closeModal(setOpenDelete)}
+              lead={selectedLead}
+              onDelete={afterAction(setOpenDelete, 'Lead deleted successfully!')}
+            />
+          )}
+        </>
+      )}
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 1.5, fontSize: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
+
+export default LeadsMaster;
