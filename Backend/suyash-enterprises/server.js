@@ -33,7 +33,6 @@ const safetyRoutes = require('./routes/HR/safetyRoutes');
 const productionRoutes = require('./routes/CRM/productionRoutes');
 const authRoutes = require('./routes/user_settings/authRoutes');
 const employeeRoutes = require('./routes/HR/employeeRoutes');
-//const contractAgencyRoutes = require('./routes/HR/contractAgencyRoutes');
 const roleRoutes = require('./routes/user_settings/roleRoutes');
 const departmentRoutes = require('./routes/HR/departmentRoutes');
 const designationRoutes = require('./routes/HR/designationRoutes');
@@ -107,6 +106,8 @@ const assemblyRoutes = require('./routes/Assembly/assemblyRoutes');
 const assemblyLineMaster = require('./routes/Assembly/assemblyLineRoutes');
 const dispatchRoutes = require('./routes/Dispatch/index');
 
+const agencyRoutes = require('./routes/HR/agencyRoutes');
+
 
 // Quality Routes
 const ncrRoutes = require('./routes/Quality/ncrRoutes');
@@ -142,6 +143,8 @@ setupSwagger(app);
 // =============================================================
 // MOUNT ALL ROUTES
 // =============================================================
+
+app.use('/api/contract-agencies', agencyRoutes);
 
 // Auth & User Management
 app.use('/api/auth', authRoutes);

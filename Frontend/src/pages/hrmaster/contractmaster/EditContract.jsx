@@ -614,23 +614,24 @@ const EditContract = ({ open, onClose, contract, onUpdate }) => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [touched, setTouched] = useState({});
 
-  useEffect(() => {
+    useEffect(() => {
     if (open && contract) {
       setFormData({
-        AgencyCode: contract.AgencyCode || '',
-        AgencyName: contract.AgencyName || '',
-        ContactPerson: contract.ContactPerson || '',
-        ContactPhone: contract.ContactPhone || '',
-        ContactEmail: contract.ContactEmail || '',
-        Address: contract.Address || '',
-        Notes: contract.Notes || '',
-        IsActive: contract.IsActive ?? true
+        AgencyCode: contract.agencyCode || '',        // Changed to lowercase
+        AgencyName: contract.agencyName || '',        // Changed to lowercase
+        ContactPerson: contract.contactPerson || '',  // Changed to lowercase
+        ContactPhone: contract.contactPhone || '',    // Changed to lowercase
+        ContactEmail: contract.contactEmail || '',    // Changed to lowercase
+        Address: contract.address || '',              // Changed to lowercase
+        Notes: contract.notes || '',                  // Changed to lowercase
+        IsActive: contract.status === 'Active'        // Maps 'Active' string to boolean
       });
       setFieldErrors({});
       setTouched({});
       setError('');
     }
   }, [open, contract]);
+
 
   // Validation helpers
   const validateAgencyCode = (code) => {
@@ -823,20 +824,25 @@ const EditContract = ({ open, onClose, contract, onUpdate }) => {
     if (!validateForm()) return;
     setLoading(true);
     setError('');
-    try {
+        try {
       const token = localStorage.getItem('token');
+
+      // 👇 CREATE A MAPPED PAYLOAD WITH LOWERCASE KEYS
+      const payload = {
+        agencyCode: formData.AgencyCode.trim(),
+        agencyName: formData.AgencyName.trim(),
+        contactPerson: formData.ContactPerson.trim(),
+        contactPhone: formData.ContactPhone.trim(),
+        contactEmail: formData.ContactEmail.trim(),
+        address: formData.Address?.trim() || '',
+        notes: formData.Notes?.trim() || '',
+        status: formData.IsActive ? 'Active' : 'Inactive' // Map boolean back to string
+      };
+
+      // 👇 SEND THE PAYLOAD INSTEAD OF THE RAW FORM DATA
       const response = await axios.put(
         `${BASE_URL}/api/contract-agencies/${contract?._id}`,
-        {
-          AgencyCode: formData.AgencyCode.trim(),
-          AgencyName: formData.AgencyName.trim(),
-          ContactPerson: formData.ContactPerson.trim(),
-          ContactPhone: formData.ContactPhone.trim(),
-          ContactEmail: formData.ContactEmail.trim(),
-          Address: formData.Address?.trim() || '',
-          Notes: formData.Notes?.trim() || '',
-          IsActive: formData.IsActive
-        },
+        payload,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -844,6 +850,7 @@ const EditContract = ({ open, onClose, contract, onUpdate }) => {
           }
         }
       );
+      
       if (response.data.success) {
         if (onUpdate) onUpdate(response.data.data);
         onClose();
@@ -852,12 +859,12 @@ const EditContract = ({ open, onClose, contract, onUpdate }) => {
       }
     } catch (err) {
       console.error('Update agency error:', err);
-      setError(err.response?.data?.message || 'Failed to update agency. Please try again.');
+      // 👇 SHOW THE REAL BACKEND ERROR
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to update agency. Please try again.');
     } finally {
       setLoading(false);
     }
   };
-
   const handleClose = () => {
     onClose();
   };
@@ -1256,3 +1263,4 @@ const EditContract = ({ open, onClose, contract, onUpdate }) => {
 };
 
 export default EditContract;
+
