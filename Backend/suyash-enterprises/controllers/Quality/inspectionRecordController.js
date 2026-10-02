@@ -1,5 +1,6 @@
 // controllers/Quality/inspectionRecordController.js
 const InspectionRecord = require('../../models/Quality/InspectionRecord');
+const mongoose = require('mongoose');
 const InspectionPlan = require('../../models/Quality/InspectionPlan');
 const WorkOrder = require('../../models/Production/WorkOrder');
 const { validateGaugeCalibration } = require('../../middleware/Quality/calibrationGate');
