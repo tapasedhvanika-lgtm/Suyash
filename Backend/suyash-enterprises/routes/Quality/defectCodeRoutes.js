@@ -11,6 +11,8 @@ const {
   getDefectCodeById,
   updateDefectCode,
   deleteDefectCode,
+  toggleDefectCodeStatus,
+  bulkDeleteDefectCodes,
 } = require('../../controllers/Quality/defectCodeController');
 const { protect, authorize } = require('../../middleware/authMiddleware');
 
@@ -373,6 +375,8 @@ router.put('/defect-codes/:id',
  *       401:
  *         description: Unauthorized
  */
+router.post('/defect-codes/bulk-delete', bulkDeleteDefectCodes);
+router.put('/defect-codes/:id/toggle-status', toggleDefectCodeStatus);
 router.delete('/defect-codes/:id', deleteDefectCode);
 
 module.exports = router;

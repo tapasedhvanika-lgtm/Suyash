@@ -1381,4 +1381,44 @@ exports.getNCRTrend = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+// ======================================================
+// DELETE NCR
+// DELETE /api/ncrs/:id
+// ======================================================
+exports.deleteNCR = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid NCR ID'
+      });
+    }
+
+    const ncr = await NCR.findById(id);
+
+    if (!ncr) {
+      return res.status(404).json({
+        success: false,
+        message: 'NCR not found'
+      });
+    }
+
+    await NCR.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'NCR deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete NCR error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to delete NCR'
+    });
+  }
+};
 
