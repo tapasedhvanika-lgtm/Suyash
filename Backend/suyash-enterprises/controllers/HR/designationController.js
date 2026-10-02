@@ -1,4 +1,5 @@
 ﻿const Designation = require('../../models/HR/Designation');
+
 // @desc    Get all designations
 // @route   GET /api/designations
 // @access  Public
@@ -15,7 +16,7 @@ const getDesignations = async (req, res) => {
     const designations = await Designation.find(query)
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .sort({ CreatedAt: -1 }); // Sort by createdAt desc first, then Level and Name
+      .sort({ CreatedAt: -1 });
     
     const total = await Designation.countDocuments(query);
     
@@ -254,10 +255,56 @@ const deleteDesignation = async (req, res) => {
   }
 };
 
+// @desc    Bulk delete designations
+// @route   DELETE /api/designations/bulk
+// @access  Public
+const bulkDeleteDesignations = async (req, res) => {
+  try {
+    const { designationIds } = req.body;
+
+    if (!designationIds || designationIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No designations selected for deletion' 
+      });
+    }
+
+    // Check if any of the selected designations have employees assigned
+    const Employee = require('../../models/HR/Employee');
+    const employeeCount = await Employee.countDocuments({ 
+      DesignationID: { $in: designationIds } 
+    });
+    
+    if (employeeCount > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete selected designations. ${employeeCount} employee(s) are assigned to them.` 
+      });
+    }
+
+    // Perform the bulk delete
+    const result = await Designation.deleteMany({ _id: { $in: designationIds } });
+
+    res.json({ 
+      success: true, 
+      message: `${result.deletedCount} designation(s) deleted successfully` 
+    });
+
+  } catch (error) {
+    console.error("❌ Error in bulk delete:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   getDesignations,
   getDesignation,
   createDesignation,
   updateDesignation,
-  deleteDesignation
+  deleteDesignation,
+  bulkDeleteDesignations // 👈 Added this
 };

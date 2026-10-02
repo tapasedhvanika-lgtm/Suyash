@@ -1049,3 +1049,39 @@ exports.getAllTraining = async (req, res) => {
     });
   }
 };
+
+// UPDATE ACCIDENT (For the general Edit Modal)
+exports.updateAccident = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate ID format (basic check)
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ success: false, message: 'Invalid accident ID format' });
+    }
+
+    // Update with whatever data the frontend sends
+    const updatedAccident = await Accident.findByIdAndUpdate(
+      id,
+      { 
+        ...req.body,
+        UpdatedAt: Date.now()
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedAccident) {
+      return res.status(404).json({ success: false, message: 'Accident record not found' });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Accident updated successfully', 
+      data: updatedAccident 
+    });
+
+  } catch (error) {
+    console.error("❌ Error updating accident:", error);
+    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+  }
+};

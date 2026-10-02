@@ -581,6 +581,10 @@ router.delete('/training/:id', safetyController.deleteTraining);
  *       200:
  *         description: List of training programs
  */
+
+// Add this new route for the general Edit modal
+router.put('/accidents/:id/investigate', safetyController.updateInvestigation);
+router.put('/accidents/:id', safetyController.updateAccident); // 👈 Keep it with the accident routes
 router.get('/training', safetyController.getAllTraining);
 
 /**
