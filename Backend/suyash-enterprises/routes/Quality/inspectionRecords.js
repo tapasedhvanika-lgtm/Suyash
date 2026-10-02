@@ -10,6 +10,7 @@ const {
   getAllInspectionRecords,
   getRecordById,
   generateInspectionReport,
+  bulkDeleteInspectionRecords,
 } = require('../../controllers/Quality/inspectionRecordController');
 const { protect, authorize } = require('../../middleware/authMiddleware');
 router.use(protect);
@@ -466,6 +467,7 @@ router.get('/by-grn/:grn_id', getRecordsByGRN);
  *         description: Server error
  */
 router.get('/all', getAllInspectionRecords);
+router.post('/bulk-delete', bulkDeleteInspectionRecords);
 
 // ======================================================
 // GET BY ID — must be last to avoid swallowing named routes
