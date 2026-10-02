@@ -1434,19 +1434,19 @@ const ActionMenu = ({ accident, onView, onInvestigate, onEdit, onDelete, anchorE
           </MenuItem>
         )}
 
-        {canUpdate && (
-          <>
-            <MenuItem onClick={() => { onEdit(accident); onClose(); }}>
-              <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Edit</ListItemText>
-            </MenuItem>
+       {canUpdate && (
+  <MenuItem onClick={() => { onEdit(accident); onClose(); }}>
+    <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+    <ListItemText>Edit</ListItemText>
+  </MenuItem>
+)}
 
-            <MenuItem onClick={() => { onInvestigate(accident); onClose(); }}>
-              <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Investigate</ListItemText>
-            </MenuItem>
-          </>
-        )}
+{canUpdate && (
+  <MenuItem onClick={() => { onInvestigate(accident); onClose(); }}>
+    <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+    <ListItemText>Investigate</ListItemText>
+  </MenuItem>
+)}
 
         {canDelete && (
           <MenuItem onClick={() => { onDelete(accident); onClose(); }}>
@@ -1686,7 +1686,7 @@ const AccidentMaster = () => {
   };
 
   // Handle Investigate accident
-  const handleInvestigateAccident = (updatedAccident) => {
+ /* const handleInvestigateAccident = (updatedAccident) => {
     console.log('Received updated accident:', updatedAccident);
     console.log('New status:', updatedAccident.investigationStatus);
     const updatedAccidents = accidents.map(accident =>
@@ -1706,6 +1706,20 @@ const AccidentMaster = () => {
     setAccidents(updatedAccidents);
     setFilteredAccidents(updatedAccidents);
     showNotification('Accident updated successfully!', 'success');
+  };
+  */
+
+
+     // Handle Investigate accident
+  const handleInvestigateAccident = () => { // 👈 REMOVED THE PARAMETER
+    showNotification('Investigation updated successfully!', 'success');
+    fetchAccidents(false); 
+  };
+
+  // Handle Edit accident
+  const handleEditAccident = () => { // 👈 REMOVED THE PARAMETER
+    showNotification('Accident updated successfully!', 'success');
+    fetchAccidents(false); 
   };
 
   // Handle delete accident
@@ -2249,8 +2263,8 @@ const AccidentMaster = () => {
                         {getSeverityChip(accident.severity)}
                       </TableCell>
                       <TableCell>
-                        {getStatusChip(accident.investigationStatus)}
-                      </TableCell>
+  {getStatusChip(accident.investigationStatus || accident.status)}
+</TableCell>
                       <TableCell>
                         <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.primary }}>
                           {accident.employee?.FirstName || accident.reportedBy?.name || 'N/A'}

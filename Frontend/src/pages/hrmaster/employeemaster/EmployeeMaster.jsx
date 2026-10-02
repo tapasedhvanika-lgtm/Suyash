@@ -1588,31 +1588,30 @@ const EmployeeMaster = () => {
   };
 
   // Handle bulk delete
-  const handleBulkDelete = async () => {
-    if (!canDelete) return;
+    const handleBulkDelete = async () => {
+    if (!canDelete || selected.length === 0) return;
 
     try {
       const token = localStorage.getItem('token');
+      // 👈 This hits the new backend route we just created
       const response = await axios.delete(`${BASE_URL}/api/employees/bulk`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        data: { employeeIds: selected }
+        headers: { Authorization: `Bearer ${token}` },
+        data: { employeeIds: selected } // Axios sends the body inside 'data' for DELETE
       });
 
       if (response.data.success) {
-        showNotification(`${selected.length} employees deleted successfully!`, 'success');
-        setSelected([]);
-        fetchEmployees(); // Refresh the list
+        showNotification(response.data.message, 'success');
+        setSelected([]); // Clear the checkboxes
+        fetchEmployees(); // Refresh the table (check your actual fetch function name)
       } else {
-        showNotification('Failed to delete employees', 'error');
+        showNotification(response.data.message || 'Failed to delete employees', 'error');
       }
     } catch (err) {
-      console.error('Error bulk deleting employees:', err);
-      showNotification('Failed to delete employees. Please try again.', 'error');
+      console.error('Bulk delete error:', err);
+      showNotification(err.response?.data?.message || 'Failed to delete employees', 'error');
     }
   };
-
+  
   // Action menu handlers
   const handleActionMenuOpen = (event, employee) => {
     setActionMenuAnchor(event.currentTarget);

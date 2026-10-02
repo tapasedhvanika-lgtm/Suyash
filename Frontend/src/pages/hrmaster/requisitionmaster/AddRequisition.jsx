@@ -414,6 +414,7 @@ const AddRequisition = ({ open, onClose, onAdd }) => {
         employmentType: formData.employmentType,
         reasonForHire: formData.reasonForHire,
         education: formData.education,
+        //experienceYears: formatExperience(formData.experience),
         experienceYears: formData.experienceYears,
         skills: formData.skills,
         budgetMin: parseInt(formData.budgetMin),
@@ -937,18 +938,29 @@ const AddRequisition = ({ open, onClose, onAdd }) => {
                     sx={inputStyle}
                   />
                 </Grid>
+
+              
+
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography sx={labelStyle}>Experience (Years)</Typography>
-                  <TextField
-                    fullWidth
-                    name="experienceYears"
-                    value={formData.experienceYears}
-                    onChange={handleTextChange}
-                    placeholder="e.g., 0, 1, 2"
-                    helperText="Optional"
-                    sx={inputStyle}
-                  />
+                  <FormControl fullWidth size="small">
+                    <Select
+                      name="experienceYears"
+                      value={formData.experienceYears}
+                      onChange={handleChange}
+                      displayEmpty
+                      sx={inputStyle}
+                    >
+                      <MenuItem value="" disabled sx={{ fontSize: '0.75rem' }}>Select experience</MenuItem>
+                      <MenuItem value="Fresher" sx={{ fontSize: '0.75rem' }}>Fresher</MenuItem>
+                      <MenuItem value="<1" sx={{ fontSize: '0.75rem' }}>Less than 1 year</MenuItem>
+                      <MenuItem value="0-1" sx={{ fontSize: '0.75rem' }}>0-1 years</MenuItem>
+                      <MenuItem value="2-3" sx={{ fontSize: '0.75rem' }}>2-3 years</MenuItem>
+                      <MenuItem value="5+" sx={{ fontSize: '0.75rem' }}>5+ years</MenuItem>
+                    </Select>
+                  </FormControl>
                 </Grid>
+
 
                 <Grid size={{ xs: 12 }}>
                   <Typography sx={labelStyle}>Skills</Typography>

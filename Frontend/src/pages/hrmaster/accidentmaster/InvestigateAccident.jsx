@@ -80,7 +80,6 @@ const EditAccident = ({ open, onClose, accident, onUpdate }) => {
       });
 
       if (response.data.success) {
-        // Fix: Users are directly in response.data.data, not in response.data.data.users
         const usersData = response.data.data || [];
         setUsers(usersData);
       }
@@ -128,11 +127,9 @@ const EditAccident = ({ open, onClose, accident, onUpdate }) => {
     };
   }, [usersSearch, usersOpen]);
 
-  // Prefill Data
+  // 1. Prefill Data (Runs ONLY when the modal opens or the accident changes)
   useEffect(() => {
-    if (accident && users.length > 0) {
-      const selectedUser = users.find(user => user._id === accident.investigationBy) || null;
-      
+    if (open && accident) {
       setFormData({
         rootCause: accident.rootCause || '',
         correctiveAction: accident.correctiveAction || '',
@@ -141,25 +138,27 @@ const EditAccident = ({ open, onClose, accident, onUpdate }) => {
         investigationDate: accident.investigationDate
           ? new Date(accident.investigationDate).toISOString().substring(0, 10)
           : '',
-        investigationBy: selectedUser,
+        investigationBy: accident.investigationBy || null, // Store ID initially
         costIncurred: accident.costIncurred?.toString() || ''
       });
-      
-      // Set input value for the selected user
+    }
+  }, [open, accident]);
+
+  // 2. Update Autocomplete object when users list loads
+  useEffect(() => {
+    // If users just loaded and we have an ID string, map it to the user object
+    if (users.length > 0 && formData.investigationBy && typeof formData.investigationBy === 'string') {
+      const selectedUser = users.find(user => user._id === formData.investigationBy);
       if (selectedUser) {
+        setFormData(prev => ({ ...prev, investigationBy: selectedUser }));
+        
         const displayName = selectedUser.Username && selectedUser.Email 
           ? `${selectedUser.Username} (${selectedUser.Email})`
           : (selectedUser.Username || selectedUser.Email || 'Unknown User');
         setUsersInputValue(displayName);
       }
-    } else if (accident && accident.investigationBy && users.length === 0) {
-      // Store the ID temporarily until users are loaded
-      setFormData(prev => ({
-        ...prev,
-        investigationBy: accident.investigationBy
-      }));
     }
-  }, [accident, users]);
+  }, [users, formData.investigationBy]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -212,64 +211,64 @@ const EditAccident = ({ open, onClose, accident, onUpdate }) => {
     setActiveStep(prev => prev - 1);
   };
 
- const handleSubmit = async () => {
-  const stepError = validateStep();
-  if (stepError) {
-    setError(stepError);
-    return;
-  }
-
-  setLoading(true);
-  setError('');
-
-  try {
-    const token = localStorage.getItem('token');
-
-        // Format the investigationBy properly
-    let investigationById = null;
-    if (formData.investigationBy) {
-      investigationById = typeof formData.investigationBy === 'object' 
-        ? formData.investigationBy._id 
-        : formData.investigationBy;
+  const handleSubmit = async () => {
+    const stepError = validateStep();
+    if (stepError) {
+      setError(stepError);
+      return;
     }
-    const payload = {
-      rootCause: formData.rootCause,
-      correctiveAction: formData.correctiveAction || '',
-      preventiveAction: formData.preventiveAction || '',
-      investigationStatus: formData.investigationStatus,
-      investigationDate: formData.investigationDate ? new Date(formData.investigationDate).toISOString() : new Date().toISOString(),
-      investigationBy: investigationById,
-      costIncurred: parseFloat(formData.costIncurred || 0)
-    };
 
-    console.log('Sending payload:', payload); // Debug log
+    setLoading(true);
+    setError('');
 
-    const response = await axios.put(
-      `${BASE_URL}/api/safety/accidents/${accident._id}/investigate`,
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    try {
+      const token = localStorage.getItem('token');
 
-    console.log('API Response:', response.data); // Debug log
+      // Format the investigationBy properly
+      let investigationById = null;
+      if (formData.investigationBy) {
+        investigationById = typeof formData.investigationBy === 'object' 
+          ? formData.investigationBy._id 
+          : formData.investigationBy;
+      }
+      
+      const payload = {
+        rootCause: formData.rootCause,
+        correctiveAction: formData.correctiveAction || '',
+        preventiveAction: formData.preventiveAction || '',
+        investigationStatus: formData.investigationStatus,
+        investigationDate: formData.investigationDate ? new Date(formData.investigationDate).toISOString() : new Date().toISOString(),
+        investigationBy: investigationById,
+        costIncurred: parseFloat(formData.costIncurred || 0)
+      };
 
-    if (response.data.success) {
-      // Make sure we're passing the updated accident correctly
-      const updatedAccident = response.data.data;
-      console.log('Updated accident from API:', updatedAccident);
-      console.log('New status:', updatedAccident.investigationStatus);
-      onUpdate(updatedAccident);
-      handleClose();
-    } else {
-      setError(response.data.message || 'Update failed');
+      console.log('Sending payload:', payload);
+
+      const response = await axios.put(
+        `${BASE_URL}/api/safety/accidents/${accident._id}/investigate`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      console.log('API Response:', response.data);
+
+      if (response.data.success) {
+        const updatedAccident = response.data.data;
+        console.log('Updated accident from API:', updatedAccident);
+        console.log('New status:', updatedAccident.investigationStatus);
+        onUpdate(updatedAccident);
+        handleClose();
+      } else {
+        setError(response.data.message || 'Update failed');
+      }
+    } catch (err) {
+      console.error('Full error:', err);
+      console.error('Error response:', err.response?.data);
+      setError(err.response?.data?.message || 'Update failed. Try again.');
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('Full error:', err);
-    console.error('Error response:', err.response?.data);
-    setError(err.response?.data?.message || 'Update failed. Try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleClose = () => {
     setActiveStep(0);

@@ -1299,12 +1299,28 @@ const DesignationMaster = () => {
   };
   
   // Handle bulk delete
-  const handleBulkDelete = () => {
-    if (!canDelete && !isSuperAdmin) {
-      showNotification('You do not have permission to delete designations', 'error');
-      return;
+    const handleBulkDelete = async () => {
+    if (!canDelete || selected.length === 0) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      // 👇 This calls the backend route we just created
+      const response = await axios.delete(`${BASE_URL}/api/designations/bulk`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { designationIds: selected } // Axios sends the body inside 'data' for DELETE
+      });
+
+      if (response.data.success) {
+        showNotification(response.data.message, 'success');
+        setSelected([]); // Clear the checkboxes
+        fetchDesignations(); // Refresh the table
+      } else {
+        showNotification(response.data.message || 'Failed to delete designations', 'error');
+      }
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      showNotification(err.response?.data?.message || 'Failed to delete designations', 'error');
     }
-    showNotification('Bulk delete requires API implementation', 'warning');
   };
   
   // Action menu handlers

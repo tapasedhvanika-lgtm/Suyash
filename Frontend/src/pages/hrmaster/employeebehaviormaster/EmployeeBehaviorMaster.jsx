@@ -1359,14 +1359,36 @@ const EmployeeBehaviorMaster = () => {
   };
 
   // Handle bulk delete
-  const handleBulkDelete = () => {
-    if (!canDelete && !isSuperAdmin) {
-      showNotification("You don't have permission to delete behavior records", "error");
-      return;
+  // Handle bulk delete
+const handleBulkDelete = async () => {
+  if (!canDelete && !isSuperAdmin) {
+    showNotification("You don't have permission to delete behavior records", "error");
+    return;
+  }
+  if (selected.length === 0) return;
+
+  try {
+    const token = localStorage.getItem("token");
+    const response = await axios.delete(`${BASE_URL}/api/employee-behavior/bulk`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: { behaviorIds: selected } // Axios sends body inside 'data' for DELETE
+    });
+
+    if (response.data.success) {
+      showNotification(response.data.message, "success");
+      setSelected([]); // Clear checkboxes
+      fetchBehaviors(); // Refresh the table
+    } else {
+      showNotification(response.data.message || "Failed to delete behavior records", "error");
     }
-    if (selected.length === 0) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
-  };
+  } catch (err) {
+    console.error("Bulk delete error:", err);
+    showNotification(
+      err.response?.data?.message || "Failed to delete behavior records",
+      "error"
+    );
+  }
+};
 
   // Handle clear search
   const handleClearSearch = () => {

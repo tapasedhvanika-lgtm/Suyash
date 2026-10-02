@@ -472,10 +472,28 @@ const DepartmentMaster = () => {
     showNotification('Department deleted successfully!', 'success');
   };
   
-  // Handle bulk delete
-  const handleBulkDelete = () => {
-    if (!canDelete) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
+  // 👇 Handle bulk delete (FIXED)
+  const handleBulkDelete = async () => {
+    if (!canDelete || selected.length === 0) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(`${BASE_URL}/api/departments/bulk`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { departmentIds: selected } // Axios sends body in 'data' for DELETE
+      });
+
+      if (response.data.success) {
+        showNotification(response.data.message, 'success');
+        setSelected([]); // Clear checkboxes
+        fetchDepartments(); // Refresh table to show latest data
+      } else {
+        showNotification(response.data.message || 'Failed to delete departments', 'error');
+      }
+    } catch (err) {
+      console.error('Bulk delete error:', err);
+      showNotification(err.response?.data?.message || 'Failed to delete departments', 'error');
+    }
   };
   
   // Action menu handlers
