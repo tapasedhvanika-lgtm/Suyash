@@ -10,6 +10,7 @@ const {
   submitForApproval,
   approvePlan,
   rejectPlan,
+  deletePlan,
 } = require('../../controllers/Quality/inspectionPlanController');
 
 const { protect, authorize } = require('../../middleware/authMiddleware');
@@ -390,5 +391,6 @@ router.post('/:id/approve', approvePlan);
  *         description: Server error
  */
 router.post('/:id/reject', rejectPlan);
+router.delete('/:id', deletePlan);
 
 module.exports = router;
