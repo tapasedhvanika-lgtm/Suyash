@@ -17,6 +17,7 @@ const {
   addAction,
   updateActionStatus,
   getNCRTrend,
+  deleteNCR,
 } = require('../../controllers/Quality/ncrController');
 const { protect, authorize } = require('../../middleware/authMiddleware');
 
@@ -445,6 +446,7 @@ router.get('/trend', getNCRTrend);
  *         description: Unauthorized
  */
 router.get('/:id', getNCRById);
+router.delete('/:id', deleteNCR);
 
 /**
  * @swagger

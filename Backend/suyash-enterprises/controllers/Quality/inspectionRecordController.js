@@ -1,5 +1,6 @@
 // controllers/Quality/inspectionRecordController.js
 const InspectionRecord = require('../../models/Quality/InspectionRecord');
+const mongoose = require('mongoose');
 const InspectionPlan = require('../../models/Quality/InspectionPlan');
 const WorkOrder = require('../../models/Production/WorkOrder');
 const { validateGaugeCalibration } = require('../../middleware/Quality/calibrationGate');
@@ -531,7 +532,104 @@ const getRecordsByGRN = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+// ======================================================
+// BULK DELETE INSPECTION RECORDS
+// POST /api/inspection-records/bulk-delete
+// Soft-deletes selected inspection records
+// ======================================================
+const bulkDeleteInspectionRecords = async (req, res) => {
+  try {
+    const { ids } = req.body;
 
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide Inspection Record IDs'
+      });
+    }
+
+    const results = [];
+    let deletedCount = 0;
+    let failedCount = 0;
+
+    for (const id of ids) {
+      try {
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+          results.push({
+            id,
+            success: false,
+            message: 'Invalid Inspection Record ID format'
+          });
+
+          failedCount++;
+          continue;
+        }
+
+        const record = await InspectionRecord.findOneAndUpdate(
+          {
+            _id: id,
+            is_active: true
+          },
+          {
+            is_active: false
+          },
+          {
+            new: true
+          }
+        );
+
+        if (!record) {
+          results.push({
+            id,
+            success: false,
+            message: 'Inspection Record not found or already inactive'
+          });
+
+          failedCount++;
+          continue;
+        }
+
+        results.push({
+          id,
+          success: true,
+          message: `Inspection Record "${record.inspection_id}" deactivated`
+        });
+
+        deletedCount++;
+
+      } catch (error) {
+        console.error(
+          `[bulkDeleteInspectionRecords] Error deleting record ${id}:`,
+          error
+        );
+
+        results.push({
+          id,
+          success: false,
+          message: error.message || 'Failed to delete Inspection Record'
+        });
+
+        failedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: deletedCount > 0,
+      message: `${deletedCount} Inspection Record(s) processed successfully, ${failedCount} failed`,
+      deletedCount,
+      failedCount,
+      results
+    });
+
+  } catch (error) {
+    console.error('[bulkDeleteInspectionRecords] Error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to bulk delete Inspection Records'
+    });
+  }
+};
 // ======================================================
 // GET RECORD BY ID
 // ======================================================
@@ -600,4 +698,5 @@ module.exports = {
   getRecordById,
   generateInspectionReport,
   getAllInspectionRecords, 
+  bulkDeleteInspectionRecords,
 };
