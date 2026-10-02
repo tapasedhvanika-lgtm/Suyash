@@ -70,16 +70,16 @@ const getEmployees = async (req, res) => {
       query.SkillLevel = skillLevel;
     }
 
-// Filter by contract company
-if (contractCompany) {
-  const validCompanies = ['DISTIL', 'AARADHYA', 'MAHI'];
-  if (validCompanies.includes(contractCompany.toUpperCase())) {
-    query.ContractCompany = contractCompany.toUpperCase();
-  } else {
-    // Optionally return empty result for invalid value
-    query.ContractCompany = { $in: [] };
-  }
-}
+    // Filter by contract company
+    if (contractCompany) {
+      const validCompanies = ['DISTIL', 'AARADHYA', 'MAHI'];
+      if (validCompanies.includes(contractCompany.toUpperCase())) {
+        query.ContractCompany = contractCompany.toUpperCase();
+      } else {
+        query.ContractCompany = { $in: [] };
+      }
+    }
+
     // Search functionality
     if (search) {
       const searchRegex = new RegExp(search, 'i');
@@ -151,7 +151,6 @@ const getEmployee = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if ID is valid
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ 
         success: false, 
@@ -171,7 +170,6 @@ const getEmployee = async (req, res) => {
       });
     }
 
-    // Add virtual fields
     const employeeData = {
       ...employee.toObject(),
       FullName: employee.FullName,
@@ -192,7 +190,6 @@ const getEmployee = async (req, res) => {
   }
 };
 
-
 /**
  * @desc    Create new employee
  * @route   POST /api/employees
@@ -202,14 +199,12 @@ const createEmployee = async (req, res) => {
   try {
     console.log('Creating employee with data:', JSON.stringify(req.body, null, 2));
 
-    // Generate unique employee ID with retry mechanism
     let employeeID;
     let isUnique = false;
     let attempts = 0;
     const maxAttempts = 10;
 
     while (!isUnique && attempts < maxAttempts) {
-      // Get the latest employee ID pattern
       const lastEmployee = await Employee.findOne().sort({ CreatedAt: -1 }).select('EmployeeID');
       
       let employeeNumber = 1;
@@ -217,14 +212,12 @@ const createEmployee = async (req, res) => {
       if (lastEmployee && lastEmployee.EmployeeID) {
         const match = lastEmployee.EmployeeID.match(/\d+/);
         if (match) {
-          // Add attempts counter to ensure uniqueness even in race conditions
           employeeNumber = parseInt(match[0]) + 1 + attempts;
         }
       }
       
       employeeID = `EMP${employeeNumber.toString().padStart(5, '0')}`;
       
-      // Check if this ID already exists (double-check for race conditions)
       const existingEmployee = await Employee.findOne({ EmployeeID: employeeID });
       if (!existingEmployee) {
         isUnique = true;
@@ -243,7 +236,6 @@ const createEmployee = async (req, res) => {
 
     console.log(`Generated unique EmployeeID: ${employeeID}`);
 
-    // Validate required fields
     const requiredFields = [
       'FirstName', 'LastName', 'Gender', 'DateOfBirth',
       'Email', 'Phone', 'Address', 'DepartmentID',
@@ -258,7 +250,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // VALIDATE DEPARTMENT ID
     if (!mongoose.Types.ObjectId.isValid(req.body.DepartmentID)) {
       return res.status(400).json({
         success: false,
@@ -274,7 +265,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // VALIDATE DESIGNATION ID
     if (!mongoose.Types.ObjectId.isValid(req.body.DesignationID)) {
       return res.status(400).json({
         success: false,
@@ -290,7 +280,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // VALIDATE SUPERVISOR ID (if provided)
     if (req.body.SupervisorID) {
       if (!mongoose.Types.ObjectId.isValid(req.body.SupervisorID)) {
         return res.status(400).json({
@@ -315,7 +304,6 @@ const createEmployee = async (req, res) => {
       }
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(req.body.Email)) {
       return res.status(400).json({
@@ -324,7 +312,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Calculate age from DOB
     const dob = new Date(req.body.DateOfBirth);
     const doj = new Date(req.body.DateOfJoining);
     const ageDiff = Date.now() - dob.getTime();
@@ -338,7 +325,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Check if email already exists
     const existingEmail = await Employee.findOne({ Email: req.body.Email });
     if (existingEmail) {
       return res.status(400).json({
@@ -347,7 +333,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Validate ContractCompany based on EmploymentType (MOVED THIS UP)
     if (req.body.EmploymentType === 'contract-based') {
       if (!req.body.ContractCompany) {
         return res.status(400).json({
@@ -363,7 +348,6 @@ const createEmployee = async (req, res) => {
       }
     }
 
-    // For PieceRate employees, validate that they have a PayStructureType of 'PieceRate'
     if (req.body.EmploymentType === 'PieceRate' && req.body.PayStructureType !== 'PieceRate') {
       return res.status(400).json({
         success: false,
@@ -371,7 +355,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Prepare employee data
     const employeeData = {
       EmployeeID: employeeID,
       FirstName: req.body.FirstName.trim(),
@@ -404,21 +387,16 @@ const createEmployee = async (req, res) => {
       ESINumber: req.body.ESINumber || ''
     };
     
-    // CRITICAL FIX: Only set ContractCompany for contract-based employees
-    // For non-contract employees, don't include the field at all or set to undefined
     if (req.body.EmploymentType === 'contract-based') {
       employeeData.ContractCompany = req.body.ContractCompany;
     } else {
-      // Set to undefined so Mongoose uses the default (null) and doesn't trigger validation
       employeeData.ContractCompany = undefined;
     }
     
-    // Add SupervisorID only if provided and valid
     if (req.body.SupervisorID && mongoose.Types.ObjectId.isValid(req.body.SupervisorID)) {
       employeeData.SupervisorID = req.body.SupervisorID;
     }
 
-    // Add BankDetails if provided
     if (req.body.BankDetails) {
       employeeData.BankDetails = {
         accountNumber: req.body.BankDetails.accountNumber || '',
@@ -430,7 +408,6 @@ const createEmployee = async (req, res) => {
       };
     }
 
-    // Add EmergencyContact if provided
     if (req.body.EmergencyContact) {
       employeeData.EmergencyContact = {
         name: req.body.EmergencyContact.name || '',
@@ -442,34 +419,21 @@ const createEmployee = async (req, res) => {
 
     console.log('Creating employee with prepared data...');
     
-    // Use create with explicit error handling for duplicate key
     try {
       const employee = await Employee.create(employeeData);
       console.log('Employee created successfully:', employee.EmployeeID);
 
-      // Populate references without throwing errors
       try {
         await employee.populate([
-          { 
-            path: 'DepartmentID', 
-            select: 'DepartmentName Description',
-            model: 'Department'
-          },
-          { 
-            path: 'DesignationID', 
-            select: 'DesignationName Level Description',
-            model: 'Designation'
-          }
+          { path: 'DepartmentID', select: 'DepartmentName Description', model: 'Department' },
+          { path: 'DesignationID', select: 'DesignationName Level Description', model: 'Designation' }
         ]);
 
         if (employee.SupervisorID) {
           await employee.populate({
             path: 'SupervisorID',
             select: 'EmployeeID FirstName LastName DesignationID',
-            populate: {
-              path: 'DesignationID',
-              select: 'DesignationName'
-            }
+            populate: { path: 'DesignationID', select: 'DesignationName' }
           });
         }
       } catch (populateError) {
@@ -489,16 +453,13 @@ const createEmployee = async (req, res) => {
       });
       
     } catch (createError) {
-      // If duplicate key error on EmployeeID, retry once more
       if (createError.code === 11000 && createError.keyPattern?.EmployeeID) {
         console.log('Duplicate EmployeeID detected, retrying with new ID...');
         
-        // Generate a new ID with timestamp to ensure uniqueness
         const timestamp = Date.now().toString().slice(-5);
         const newEmployeeID = `EMP${timestamp}`;
         employeeData.EmployeeID = newEmployeeID;
         
-        // Try again
         const employee = await Employee.create(employeeData);
         console.log('Employee created successfully on retry:', employee.EmployeeID);
         
@@ -513,7 +474,6 @@ const createEmployee = async (req, res) => {
         });
       }
       
-      // Re-throw other errors
       throw createError;
     }
 
@@ -527,7 +487,6 @@ const createEmployee = async (req, res) => {
       stack: error.stack
     });
     
-    // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0];
       const value = error.keyValue?.[field];
@@ -537,7 +496,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors || {}).map(err => 
         `${err.path}: ${err.message}`
@@ -548,7 +506,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Handle CastError (ObjectId errors)
     if (error.name === 'CastError') {
       return res.status(400).json({ 
         success: false, 
@@ -556,7 +513,6 @@ const createEmployee = async (req, res) => {
       });
     }
 
-    // Generic error
     res.status(500).json({ 
       success: false, 
       message: 'Error creating employee',
@@ -574,7 +530,6 @@ const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if ID is valid
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ 
         success: false, 
@@ -582,7 +537,6 @@ const updateEmployee = async (req, res) => {
       });
     }
 
-    // Check if employee exists
     let employee = await Employee.findById(id);
     if (!employee) {
       return res.status(404).json({ 
@@ -591,93 +545,57 @@ const updateEmployee = async (req, res) => {
       });
     }
 
-    // Validate department if being updated
     if (req.body.DepartmentID) {
       if (!mongoose.Types.ObjectId.isValid(req.body.DepartmentID)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Department ID format'
-        });
+        return res.status(400).json({ success: false, message: 'Invalid Department ID format' });
       }
       const department = await Department.findById(req.body.DepartmentID);
       if (!department) {
-        return res.status(400).json({
-          success: false,
-          message: 'Department not found'
-        });
+        return res.status(400).json({ success: false, message: 'Department not found' });
       }
     }
 
-    // Validate designation if being updated
     if (req.body.DesignationID) {
       if (!mongoose.Types.ObjectId.isValid(req.body.DesignationID)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Designation ID format'
-        });
+        return res.status(400).json({ success: false, message: 'Invalid Designation ID format' });
       }
       const designation = await Designation.findById(req.body.DesignationID);
       if (!designation) {
-        return res.status(400).json({
-          success: false,
-          message: 'Designation not found'
-        });
+        return res.status(400).json({ success: false, message: 'Designation not found' });
       }
     }
 
-    // Validate supervisor if being updated
     if (req.body.SupervisorID) {
       if (req.body.SupervisorID === id) {
-        return res.status(400).json({
-          success: false,
-          message: 'Employee cannot be their own supervisor'
-        });
+        return res.status(400).json({ success: false, message: 'Employee cannot be their own supervisor' });
       }
       if (!mongoose.Types.ObjectId.isValid(req.body.SupervisorID)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid Supervisor ID format'
-        });
+        return res.status(400).json({ success: false, message: 'Invalid Supervisor ID format' });
       }
       const supervisor = await Employee.findById(req.body.SupervisorID);
       if (!supervisor) {
-        return res.status(400).json({
-          success: false,
-          message: 'Supervisor not found'
-        });
+        return res.status(400).json({ success: false, message: 'Supervisor not found' });
       }
       if (supervisor.EmploymentStatus !== 'active') {
-        return res.status(400).json({
-          success: false,
-          message: 'Supervisor must be an active employee'
-        });
+        return res.status(400).json({ success: false, message: 'Supervisor must be an active employee' });
       }
     }
 
-    // Validate email format if being updated
     if (req.body.Email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(req.body.Email)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid email format'
-        });
+        return res.status(400).json({ success: false, message: 'Invalid email format' });
       }
       
-      // Check if email already exists for another employee
       const existingEmail = await Employee.findOne({ 
         Email: req.body.Email,
         _id: { $ne: id }
       });
       if (existingEmail) {
-        return res.status(400).json({
-          success: false,
-          message: 'Email already registered to another employee'
-        });
+        return res.status(400).json({ success: false, message: 'Email already registered to another employee' });
       }
     }
 
-    // Validate DateOfBirth if being updated
     if (req.body.DateOfBirth) {
       const dob = new Date(req.body.DateOfBirth);
       const ageDiff = Date.now() - dob.getTime();
@@ -685,66 +603,42 @@ const updateEmployee = async (req, res) => {
       const age = Math.abs(ageDate.getUTCFullYear() - 1970);
       
       if (age < 18) {
-        return res.status(400).json({
-          success: false,
-          message: 'Employee must be at least 18 years old'
-        });
+        return res.status(400).json({ success: false, message: 'Employee must be at least 18 years old' });
       }
     }
 
-
-    // Validate EmploymentType and PayStructureType combination
     if (req.body.EmploymentType === 'PieceRate' && req.body.PayStructureType && req.body.PayStructureType !== 'PieceRate') {
-      return res.status(400).json({
-        success: false,
-        message: 'PieceRate employees must have PayStructureType set to "PieceRate"'
-      });
+      return res.status(400).json({ success: false, message: 'PieceRate employees must have PayStructureType set to "PieceRate"' });
     }
 
     if (req.body.PayStructureType === 'PieceRate' && req.body.EmploymentType && req.body.EmploymentType !== 'PieceRate') {
-      return res.status(400).json({
-        success: false,
-        message: 'Employees with PieceRate pay structure must have EmploymentType set to "PieceRate"'
-      });
+      return res.status(400).json({ success: false, message: 'Employees with PieceRate pay structure must have EmploymentType set to "PieceRate"' });
     }
 
-    // Prevent updating EmployeeID
     if (req.body.EmployeeID && req.body.EmployeeID !== employee.EmployeeID) {
-      return res.status(400).json({
-        success: false,
-        message: 'Employee ID cannot be changed'
-      });
+      return res.status(400).json({ success: false, message: 'Employee ID cannot be changed' });
     }
 
-    // Clean up the update data - remove any fields that shouldn't be directly updated
     const updateData = { ...req.body };
     
-    delete updateData.EmployeeID; // Ensure EmployeeID is not updated
-    delete updateData.CreatedAt; // Prevent changing creation date
-    delete updateData.PieceRateDetails; // Remove PieceRateDetails if somehow sent (now managed in master)
-if (req.body.EmploymentType === 'contract-based') {
-  if (!req.body.ContractCompany && !employee.ContractCompany) {
-    return res.status(400).json({
-      success: false,
-      message: 'ContractCompany is required for contract-based employees'
-    });
-  }
-  if (req.body.ContractCompany && !['DISTIL', 'AARADHYA', 'MAHI'].includes(req.body.ContractCompany)) {
-    return res.status(400).json({
-      success: false,
-      message: 'ContractCompany must be one of: DISTIL, AARADHYA, MAHI'
-    });
-  }
-}
+    delete updateData.EmployeeID;
+    delete updateData.CreatedAt;
+    delete updateData.PieceRateDetails;
 
-// Add to updateData
-if (req.body.ContractCompany !== undefined) {
-  updateData.ContractCompany = req.body.ContractCompany;
-}
-    // Add updated timestamp
+    if (req.body.EmploymentType === 'contract-based') {
+      if (!req.body.ContractCompany && !employee.ContractCompany) {
+        return res.status(400).json({ success: false, message: 'ContractCompany is required for contract-based employees' });
+      }
+      if (req.body.ContractCompany && !['DISTIL', 'AARADHYA', 'MAHI'].includes(req.body.ContractCompany)) {
+        return res.status(400).json({ success: false, message: 'ContractCompany must be one of: DISTIL, AARADHYA, MAHI' });
+      }
+    }
+
+    if (req.body.ContractCompany !== undefined) {
+      updateData.ContractCompany = req.body.ContractCompany;
+    }
     updateData.UpdatedAt = Date.now();
 
-    // Handle nested objects properly
     if (req.body.BankDetails) {
       updateData['BankDetails'] = {
         accountNumber: req.body.BankDetails.accountNumber || employee.BankDetails?.accountNumber || '',
@@ -765,15 +659,10 @@ if (req.body.ContractCompany !== undefined) {
       };
     }
 
-    // Update employee
     employee = await Employee.findByIdAndUpdate(
       id,
       updateData,
-      { 
-        new: true, 
-        runValidators: true,
-        context: 'query' // Important for validation that uses 'this'
-      }
+      { new: true, runValidators: true, context: 'query' }
     ).populate([
       { path: 'DepartmentID', select: 'DepartmentName Description' },
       { path: 'DesignationID', select: 'DesignationName Level Description' },
@@ -781,22 +670,12 @@ if (req.body.ContractCompany !== undefined) {
     ]);
 
     if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: 'Employee not found after update'
-      });
+      return res.status(404).json({ success: false, message: 'Employee not found after update' });
     }
 
-    // If EmploymentType was changed to PieceRate, ensure BasicSalary and other fixed components are zero
     if (req.body.EmploymentType === 'PieceRate' && employee.EmploymentType === 'PieceRate') {
-      // Optionally set salary components to zero for piece rate workers
-      // This is optional - you might want to keep historical values
       if (employee.BasicSalary > 0 || employee.HRA > 0) {
         console.log('PieceRate employee has salary components - these may be ignored in payroll');
-        // You can choose to zero them out if needed:
-        // employee.BasicSalary = 0;
-        // employee.HRA = 0;
-        // await employee.save();
       }
     }
 
@@ -807,37 +686,24 @@ if (req.body.ContractCompany !== undefined) {
         ...employee.toObject(),
         FullName: employee.FullName,
         TotalFixedSalary: employee.TotalFixedSalary,
-        // Note: PieceRateDetails is not included as it's now in master data
       }
     });
 
   } catch (error) {
     console.error('Update employee error:', error);
     
-    // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({ 
-        success: false, 
-        message: `${field} already exists` 
-      });
+      return res.status(400).json({ success: false, message: `${field} already exists` });
     }
 
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ 
-        success: false, 
-        message: messages.join(', ') 
-      });
+      return res.status(400).json({ success: false, message: messages.join(', ') });
     }
 
-    // Handle CastError (ObjectId errors)
     if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Invalid ${error.path}: ${error.value}. Must be a valid ObjectId.`
-      });
+      return res.status(400).json({ success: false, message: `Invalid ${error.path}: ${error.value}. Must be a valid ObjectId.` });
     }
 
     res.status(500).json({ 
@@ -857,23 +723,15 @@ const deleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if ID is valid
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid employee ID format' 
-      });
+      return res.status(400).json({ success: false, message: 'Invalid employee ID format' });
     }
 
     const employee = await Employee.findById(id);
     if (!employee) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Employee not found' 
-      });
+      return res.status(404).json({ success: false, message: 'Employee not found' });
     }
 
-    // Check if employee has active user account
     const userExists = await User.findOne({ EmployeeID: employee._id });
     if (userExists) {
       return res.status(400).json({ 
@@ -882,7 +740,6 @@ const deleteEmployee = async (req, res) => {
       });
     }
 
-    // Soft delete by changing status to terminated
     employee.EmploymentStatus = 'terminated';
     employee.UpdatedAt = Date.now();
     await employee.save();
@@ -894,10 +751,7 @@ const deleteEmployee = async (req, res) => {
 
   } catch (error) {
     console.error('Delete employee error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
@@ -910,35 +764,22 @@ const hardDeleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if ID is valid
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid employee ID format' 
-      });
+      return res.status(400).json({ success: false, message: 'Invalid employee ID format' });
     }
 
     const employee = await Employee.findById(id);
     if (!employee) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Employee not found' 
-      });
+      return res.status(404).json({ success: false, message: 'Employee not found' });
     }
 
-    // Check if employee has active user account
     const userExists = await User.findOne({ EmployeeID: employee._id });
     if (userExists) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Cannot delete employee with active user account' 
-      });
+      return res.status(400).json({ success: false, message: 'Cannot delete employee with active user account' });
     }
 
-    // Check for related records
     const Attendance = require('../../models/HR/Attendance');
     const Leave = require('../../models/HR/Leave');
-    const Salary = require('../../models/HR/Salary');
     
     const hasAttendance = await Attendance.exists({ EmployeeID: employee._id });
     const hasLeave = await Leave.exists({ EmployeeID: employee._id });
@@ -951,19 +792,79 @@ const hardDeleteEmployee = async (req, res) => {
       });
     }
 
-    // Perform hard delete
     await Employee.findByIdAndDelete(id);
 
-    res.json({
-      success: true,
-      message: 'Employee permanently deleted'
-    });
+    res.json({ success: true, message: 'Employee permanently deleted' });
 
   } catch (error) {
     console.error('Hard delete employee error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+/**
+ * @desc    Bulk delete employees
+ * @route   DELETE /api/employees/bulk
+ * @access  Private/SuperAdmin
+ */
+const bulkDeleteEmployees = async (req, res) => {
+  try {
+    const { employeeIds } = req.body;
+
+    if (!employeeIds || employeeIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No employees selected for deletion' 
+      });
+    }
+
+    // Validate all IDs
+    const invalidIds = employeeIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'One or more employee IDs are invalid' 
+      });
+    }
+
+    // Safety Check 1: Do any of the employees have active user accounts?
+    const usersExist = await User.countDocuments({ EmployeeID: { $in: employeeIds } });
+    if (usersExist > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete employees. ${usersExist} employee(s) have active user accounts. Delete user accounts first.` 
+      });
+    }
+
+    // Safety Check 2: Do any of the employees have related records?
+    const Attendance = require('../../models/HR/Attendance');
+    const Leave = require('../../models/HR/Leave');
+    
+    const hasAttendance = await Attendance.countDocuments({ EmployeeID: { $in: employeeIds } });
+    const hasLeave = await Leave.countDocuments({ EmployeeID: { $in: employeeIds } });
+    const hasSalary = await Salary.countDocuments({ EmployeeID: { $in: employeeIds } });
+    
+    if (hasAttendance > 0 || hasLeave > 0 || hasSalary > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot delete selected employees. They have existing records (attendance, leaves, or salary). Archive instead.' 
+      });
+    }
+
+    // Perform the bulk delete
+    const result = await Employee.deleteMany({ _id: { $in: employeeIds } });
+
+    res.json({ 
+      success: true, 
+      message: `${result.deletedCount} employee(s) deleted successfully` 
+    });
+
+  } catch (error) {
+    console.error("❌ Error in bulk delete:", error);
     res.status(500).json({ 
       success: false, 
-      message: 'Server error' 
+      message: 'Server error', 
+      error: error.message 
     });
   }
 };
@@ -975,240 +876,118 @@ const hardDeleteEmployee = async (req, res) => {
  */
 const getEmployeeStats = async (req, res) => {
   try {
-    // Basic counts
     const totalEmployees = await Employee.countDocuments();
     const activeEmployees = await Employee.countDocuments({ EmploymentStatus: 'active' });
     const resignedEmployees = await Employee.countDocuments({ EmploymentStatus: 'resigned' });
     const terminatedEmployees = await Employee.countDocuments({ EmploymentStatus: 'terminated' });
     const retiredEmployees = await Employee.countDocuments({ EmploymentStatus: 'retired' });
 
-    // Employment type distribution
     const employmentTypeStats = await Employee.aggregate([
-      {
-        $group: {
-          _id: '$EmploymentType',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          type: '$_id',
-          count: 1,
-          _id: 0
-        }
-      }
+      { $group: { _id: '$EmploymentType', count: { $sum: 1 } } },
+      { $project: { type: '$_id', count: 1, _id: 0 } }
     ]);
 
-    // Department wise distribution
     const departmentStats = await Employee.aggregate([
-      {
-        $lookup: {
-          from: 'departments',
-          localField: 'DepartmentID',
-          foreignField: '_id',
-          as: 'department'
-        }
-      },
-      {
-        $unwind: '$department'
-      },
-      {
-        $group: {
-          _id: '$department.DepartmentName',
-          count: { $sum: 1 },
-          avgSalary: { $avg: '$BasicSalary' }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
+      { $lookup: { from: 'departments', localField: 'DepartmentID', foreignField: '_id', as: 'department' } },
+      { $unwind: '$department' },
+      { $group: { _id: '$department.DepartmentName', count: { $sum: 1 }, avgSalary: { $avg: '$BasicSalary' } } },
+      { $sort: { count: -1 } }
     ]);
 
-    // Gender distribution
     const genderStats = await Employee.aggregate([
-      {
-        $group: {
-          _id: '$Gender',
-          count: { $sum: 1 }
-        }
-      }
+      { $group: { _id: '$Gender', count: { $sum: 1 } } }
     ]);
 
-    // Skill level distribution
     const skillLevelStats = await Employee.aggregate([
-      {
-        $group: {
-          _id: '$SkillLevel',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
+      { $group: { _id: '$SkillLevel', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
     ]);
 
-    // Monthly joining trend (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     const joiningTrend = await Employee.aggregate([
-      {
-        $match: {
-          DateOfJoining: { $gte: sixMonthsAgo }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$DateOfJoining' },
-            month: { $month: '$DateOfJoining' }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { '_id.year': 1, '_id.month': 1 }
-      },
-      {
-        $project: {
-          month: {
-            $concat: [
-              { $toString: '$_id.year' },
-              '-',
-              { $toString: { $cond: [{ $lt: ['$_id.month', 10] }, '0', ''] } },
-              { $toString: '$_id.month' }
-            ]
-          },
-          count: 1,
-          _id: 0
-        }
-      }
+      { $match: { DateOfJoining: { $gte: sixMonthsAgo } } },
+      { $group: { _id: { year: { $year: '$DateOfJoining' }, month: { $month: '$DateOfJoining' } }, count: { $sum: 1 } } },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+      { $project: { 
+        month: { $concat: [
+          { $toString: '$_id.year' }, '-',
+          { $toString: { $cond: [{ $lt: ['$_id.month', 10] }, '0', ''] } },
+          { $toString: '$_id.month' }
+        ]},
+        count: 1, _id: 0 
+      }}
     ]);
 
-    // Salary statistics
     const salaryStats = await Employee.aggregate([
-      {
-        $match: {
-          EmploymentStatus: 'active',
-          BasicSalary: { $gt: 0 }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          avgSalary: { $avg: '$BasicSalary' },
-          minSalary: { $min: '$BasicSalary' },
-          maxSalary: { $max: '$BasicSalary' },
-          totalSalary: { $sum: '$BasicSalary' }
-        }
-      }
+      { $match: { EmploymentStatus: 'active', BasicSalary: { $gt: 0 } } },
+      { $group: { 
+        _id: null, 
+        avgSalary: { $avg: '$BasicSalary' }, 
+        minSalary: { $min: '$BasicSalary' }, 
+        maxSalary: { $max: '$BasicSalary' }, 
+        totalSalary: { $sum: '$BasicSalary' } 
+      }}
     ]);
 
     res.json({
       success: true,
       data: {
-        counts: {
-          total: totalEmployees,
-          active: activeEmployees,
-          resigned: resignedEmployees,
-          terminated: terminatedEmployees,
-          retired: retiredEmployees
-        },
-        distributions: {
-          employmentType: employmentTypeStats,
-          department: departmentStats,
-          gender: genderStats,
-          skillLevel: skillLevelStats
-        },
-        trends: {
-          joining: joiningTrend
-        },
-        salary: salaryStats[0] || {
-          avgSalary: 0,
-          minSalary: 0,
-          maxSalary: 0,
-          totalSalary: 0
-        }
+        counts: { total: totalEmployees, active: activeEmployees, resigned: resignedEmployees, terminated: terminatedEmployees, retired: retiredEmployees },
+        distributions: { employmentType: employmentTypeStats, department: departmentStats, gender: genderStats, skillLevel: skillLevelStats },
+        trends: { joining: joiningTrend },
+        salary: salaryStats[0] || { avgSalary: 0, minSalary: 0, maxSalary: 0, totalSalary: 0 }
       }
     });
 
   } catch (error) {
     console.error('Get employee stats error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
-
 
 const getEmployeeYearlySummary = async (req, res) => {
   try {
     const { employeeId, year } = req.params;
     const targetYear = parseInt(year) || new Date().getFullYear();
 
-    // Check if employeeId is valid
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid employee ID format' 
-      });
+      return res.status(400).json({ success: false, message: 'Invalid employee ID format' });
     }
 
-    // Check if employee exists
     const employee = await Employee.findById(employeeId)
       .select('EmployeeID FirstName LastName DepartmentID DesignationID EmploymentType')
       .populate('DepartmentID', 'DepartmentName')
       .populate('DesignationID', 'DesignationName');
 
     if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: 'Employee not found'
-      });
+      return res.status(404).json({ success: false, message: 'Employee not found' });
     }
 
-    // 1. Get Overtime Data for the year from Salary model
     const overtimeData = await Salary.aggregate([
-      {
-        $match: {
-          employee: new mongoose.Types.ObjectId(employeeId),
-          'payrollPeriod.year': targetYear,
-          overtimeHours: { $gt: 0 } // Only get records with overtime
-        }
-      },
-      {
-        $group: {
-          _id: {
-            month: '$payrollPeriod.month',
-            year: '$payrollPeriod.year'
-          },
-          totalOvertimeHours: { $sum: '$overtimeHours' },
-          overtimeAmount: { $sum: '$earnings.overtime' },
-          records: { $push: '$$ROOT' }
-        }
-      },
-      {
-        $sort: { '_id.month': 1 }
-      },
-      {
-        $project: {
-          _id: 0,
-          month: '$_id.month',
-          year: '$_id.year',
-          totalOvertimeHours: 1,
-          overtimeAmount: 1,
-          monthName: {
-            $arrayElemAt: [
-              ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-              '$_id.month'
-            ]
-          }
-        }
-      }
+      { $match: {
+        employee: new mongoose.Types.ObjectId(employeeId),
+        'payrollPeriod.year': targetYear,
+        overtimeHours: { $gt: 0 }
+      }},
+      { $group: {
+        _id: { month: '$payrollPeriod.month', year: '$payrollPeriod.year' },
+        totalOvertimeHours: { $sum: '$overtimeHours' },
+        overtimeAmount: { $sum: '$earnings.overtime' },
+        records: { $push: '$$ROOT' }
+      }},
+      { $sort: { '_id.month': 1 } },
+      { $project: {
+        _id: 0, month: '$_id.month', year: '$_id.year',
+        totalOvertimeHours: 1, overtimeAmount: 1,
+        monthName: { $arrayElemAt: [
+          ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+          '$_id.month'
+        ]}
+      }}
     ]);
 
-    // Alternative: Get detailed monthly overtime
     const monthlyOvertimeDetails = await Salary.find({
       employee: employeeId,
       'payrollPeriod.year': targetYear,
@@ -1217,149 +996,71 @@ const getEmployeeYearlySummary = async (req, res) => {
     .select('payrollPeriod overtimeHours overtimeRate earnings overtimeHours')
     .sort('payrollPeriod.month');
 
-    // 2. Get Behavior Data for the year from EmployeeBehavior model
     const behaviorData = await EmployeeBehavior.aggregate([
-      {
-        $match: {
-          employeeId: new mongoose.Types.ObjectId(employeeId),
-          createdAt: {
-            $gte: new Date(`${targetYear}-01-01`),
-            $lte: new Date(`${targetYear}-12-31`)
-          },
-          isDeleted: false
-        }
-      },
-      {
-        $facet: {
-          // Monthly breakdown
-          monthlyBreakdown: [
-            {
-              $group: {
-                _id: {
-                  month: { $month: '$createdAt' },
-                  year: { $year: '$createdAt' }
-                },
-                totalEntries: { $sum: 1 },
-                averageRating: { $avg: '$rating' },
-                positiveCount: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Positive'] }, 1, 0] }
-                },
-                negativeCount: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Negative'] }, 1, 0] }
-                },
-                neutralCount: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Neutral'] }, 1, 0] }
-                },
-                openIssues: {
-                  $sum: { $cond: [{ $eq: ['$status', 'Open'] }, 1, 0] }
-                },
-                resolvedIssues: {
-                  $sum: { $cond: [{ $eq: ['$status', 'Resolved'] }, 1, 0] }
-                },
-                escalatedIssues: {
-                  $sum: { $cond: [{ $eq: ['$status', 'Escalated'] }, 1, 0] }
-                },
-                categories: { $push: '$category' }
-              }
-            },
-            {
-              $sort: { '_id.month': 1 }
-            },
-            {
-              $project: {
-                _id: 0,
-                month: '$_id.month',
-                year: '$_id.year',
-                monthName: {
-                  $arrayElemAt: [
-                    ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-                    '$_id.month'
-                  ]
-                },
-                totalEntries: 1,
-                averageRating: { $round: ['$averageRating', 1] },
-                positiveCount: 1,
-                negativeCount: 1,
-                neutralCount: 1,
-                openIssues: 1,
-                resolvedIssues: 1,
-                escalatedIssues: 1,
-                categories: 1
-              }
-            }
-          ],
-          // Category wise summary
-          categoryWise: [
-            {
-              $group: {
-                _id: '$category',
-                count: { $sum: 1 },
-                avgRating: { $avg: '$rating' },
-                positiveCount: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Positive'] }, 1, 0] }
-                },
-                negativeCount: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Negative'] }, 1, 0] }
-                }
-              }
-            },
-            {
-              $project: {
-                category: '$_id',
-                count: 1,
-                avgRating: { $round: ['$avgRating', 1] },
-                positiveCount: 1,
-                negativeCount: 1,
-                _id: 0
-              }
-            }
-          ],
-          // Overall stats
-          overallStats: [
-            {
-              $group: {
-                _id: null,
-                totalEntries: { $sum: 1 },
-                overallAvgRating: { $avg: '$rating' },
-                totalPositive: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Positive'] }, 1, 0] }
-                },
-                totalNegative: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Negative'] }, 1, 0] }
-                },
-                totalNeutral: {
-                  $sum: { $cond: [{ $eq: ['$type', 'Neutral'] }, 1, 0] }
-                },
-                openCount: {
-                  $sum: { $cond: [{ $eq: ['$status', 'Open'] }, 1, 0] }
-                },
-                resolvedCount: {
-                  $sum: { $cond: [{ $eq: ['$status', 'Resolved'] }, 1, 0] }
-                },
-                escalatedCount: {
-                  $sum: { $cond: [{ $eq: ['$status', 'Escalated'] }, 1, 0] }
-                }
-              }
-            },
-            {
-              $project: {
-                _id: 0,
-                totalEntries: 1,
-                overallAvgRating: { $round: ['$overallAvgRating', 1] },
-                totalPositive: 1,
-                totalNegative: 1,
-                totalNeutral: 1,
-                openCount: 1,
-                resolvedCount: 1,
-                escalatedCount: 1
-              }
-            }
-          ]
-        }
-      }
+      { $match: {
+        employeeId: new mongoose.Types.ObjectId(employeeId),
+        createdAt: { $gte: new Date(`${targetYear}-01-01`), $lte: new Date(`${targetYear}-12-31`) },
+        isDeleted: false
+      }},
+      { $facet: {
+        monthlyBreakdown: [
+          { $group: {
+            _id: { month: { $month: '$createdAt' }, year: { $year: '$createdAt' } },
+            totalEntries: { $sum: 1 },
+            averageRating: { $avg: '$rating' },
+            positiveCount: { $sum: { $cond: [{ $eq: ['$type', 'Positive'] }, 1, 0] } },
+            negativeCount: { $sum: { $cond: [{ $eq: ['$type', 'Negative'] }, 1, 0] } },
+            neutralCount: { $sum: { $cond: [{ $eq: ['$type', 'Neutral'] }, 1, 0] } },
+            openIssues: { $sum: { $cond: [{ $eq: ['$status', 'Open'] }, 1, 0] } },
+            resolvedIssues: { $sum: { $cond: [{ $eq: ['$status', 'Resolved'] }, 1, 0] } },
+            escalatedIssues: { $sum: { $cond: [{ $eq: ['$status', 'Escalated'] }, 1, 0] } },
+            categories: { $push: '$category' }
+          }},
+          { $sort: { '_id.month': 1 } },
+          { $project: {
+            _id: 0, month: '$_id.month', year: '$_id.year',
+            monthName: { $arrayElemAt: [
+              ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+              '$_id.month'
+            ]},
+            totalEntries: 1, averageRating: { $round: ['$averageRating', 1] },
+            positiveCount: 1, negativeCount: 1, neutralCount: 1,
+            openIssues: 1, resolvedIssues: 1, escalatedIssues: 1, categories: 1
+          }}
+        ],
+        categoryWise: [
+          { $group: {
+            _id: '$category', count: { $sum: 1 }, avgRating: { $avg: '$rating' },
+            positiveCount: { $sum: { $cond: [{ $eq: ['$type', 'Positive'] }, 1, 0] } },
+            negativeCount: { $sum: { $cond: [{ $eq: ['$type', 'Negative'] }, 1, 0] } }
+          }},
+          { $project: {
+            category: '$_id', count: 1,
+            avgRating: { $round: ['$avgRating', 1] },
+            positiveCount: 1, negativeCount: 1, _id: 0
+          }}
+        ],
+        overallStats: [
+          { $group: {
+            _id: null, totalEntries: { $sum: 1 },
+            overallAvgRating: { $avg: '$rating' },
+            totalPositive: { $sum: { $cond: [{ $eq: ['$type', 'Positive'] }, 1, 0] } },
+            totalNegative: { $sum: { $cond: [{ $eq: ['$type', 'Negative'] }, 1, 0] } },
+            totalNeutral: { $sum: { $cond: [{ $eq: ['$type', 'Neutral'] }, 1, 0] } },
+            openCount: { $sum: { $cond: [{ $eq: ['$status', 'Open'] }, 1, 0] } },
+            resolvedCount: { $sum: { $cond: [{ $eq: ['$status', 'Resolved'] }, 1, 0] } },
+            escalatedCount: { $sum: { $cond: [{ $eq: ['$status', 'Escalated'] }, 1, 0] } }
+          }},
+          { $project: {
+            _id: 0, totalEntries: 1,
+            overallAvgRating: { $round: ['$overallAvgRating', 1] },
+            totalPositive: 1, totalNegative: 1, totalNeutral: 1,
+            openCount: 1, resolvedCount: 1, escalatedCount: 1
+          }}
+        ]
+      }}
     ]);
 
-    // 3. Get recent behavior entries (last 10)
     const recentBehavior = await EmployeeBehavior.find({
       employeeId: employeeId,
       isDeleted: false
@@ -1369,7 +1070,6 @@ const getEmployeeYearlySummary = async (req, res) => {
     .sort('-createdAt')
     .limit(10);
 
-    // 4. Calculate yearly totals
     const yearlyTotals = {
       totalOvertimeHours: overtimeData.reduce((sum, item) => sum + (item.totalOvertimeHours || 0), 0),
       totalOvertimeAmount: overtimeData.reduce((sum, item) => sum + (item.overtimeAmount || 0), 0),
@@ -1381,7 +1081,6 @@ const getEmployeeYearlySummary = async (req, res) => {
       openIssuesCount: behaviorData[0]?.overallStats[0]?.openCount || 0
     };
 
-    // Prepare response
     const summary = {
       employee: {
         id: employee._id,
@@ -1402,24 +1101,16 @@ const getEmployeeYearlySummary = async (req, res) => {
         monthlyBreakdown: behaviorData[0]?.monthlyBreakdown || [],
         categoryWise: behaviorData[0]?.categoryWise || [],
         overallStats: behaviorData[0]?.overallStats[0] || {
-          totalEntries: 0,
-          overallAvgRating: 0,
-          totalPositive: 0,
-          totalNegative: 0,
-          totalNeutral: 0,
-          openCount: 0,
-          resolvedCount: 0,
-          escalatedCount: 0
+          totalEntries: 0, overallAvgRating: 0,
+          totalPositive: 0, totalNegative: 0, totalNeutral: 0,
+          openCount: 0, resolvedCount: 0, escalatedCount: 0
         },
         recentEntries: recentBehavior
       },
       generatedAt: new Date()
     };
 
-    res.status(200).json({
-      success: true,
-      data: summary
-    });
+    res.status(200).json({ success: true, data: summary });
 
   } catch (error) {
     console.error('Error generating employee yearly summary:', error);
@@ -1430,8 +1121,7 @@ const getEmployeeYearlySummary = async (req, res) => {
     });
   }
 };
-    
-    
+
 module.exports = {
   getEmployees,
   getEmployee,
@@ -1439,6 +1129,7 @@ module.exports = {
   updateEmployee,
   deleteEmployee,
   hardDeleteEmployee,
+  bulkDeleteEmployees, // 👈 Added this
   getEmployeeStats,
   getEmployeeYearlySummary
 };

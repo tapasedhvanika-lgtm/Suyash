@@ -1,7 +1,6 @@
 ﻿const Department = require('../../models/HR/Department');
-// @desc    Get all departments
-// @route   GET /api/departments
-// @access  Public
+const Employee = require('../../models/HR/Employee');
+
 // @desc    Get all departments (latest first)
 // @route   GET /api/departments
 // @access  Public
@@ -18,7 +17,7 @@ const getDepartments = async (req, res) => {
     const departments = await Department.find(query)
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .sort({ CreatedAt: -1 }); // Changed from DepartmentName: 1 to CreatedAt: -1 for latest first
+      .sort({ CreatedAt: -1 });
     
     const total = await Department.countDocuments(query);
     
@@ -221,7 +220,6 @@ const deleteDepartment = async (req, res) => {
     }
     
     // Check if department has employees
-    const Employee = require('../../models/HR/Employee');
     const employeeCount = await Employee.countDocuments({ DepartmentID: department._id });
     
     if (employeeCount > 0) {
@@ -256,10 +254,55 @@ const deleteDepartment = async (req, res) => {
   }
 };
 
+// @desc    Bulk delete departments
+// @route   DELETE /api/departments/bulk
+// @access  Public
+const bulkDeleteDepartments = async (req, res) => {
+  try {
+    const { departmentIds } = req.body;
+
+    if (!departmentIds || departmentIds.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No departments selected for deletion' 
+      });
+    }
+
+    // Check if any of the selected departments have employees assigned
+    const employeeCount = await Employee.countDocuments({ 
+      DepartmentID: { $in: departmentIds } 
+    });
+    
+    if (employeeCount > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete selected departments. ${employeeCount} employee(s) are assigned to them.` 
+      });
+    }
+
+    // Perform the bulk delete
+    const result = await Department.deleteMany({ _id: { $in: departmentIds } });
+
+    res.json({ 
+      success: true, 
+      message: `${result.deletedCount} department(s) deleted successfully` 
+    });
+
+  } catch (error) {
+    console.error("❌ Error in bulk delete:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   getDepartments,
   getDepartment,
   createDepartment,
   updateDepartment,
-  deleteDepartment
+  deleteDepartment,
+  bulkDeleteDepartments
 };
