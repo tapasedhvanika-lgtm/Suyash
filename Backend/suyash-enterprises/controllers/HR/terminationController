@@ -15,7 +15,7 @@ const initiateTermination = async (req, res) => {
       });
     }
     
-     // ==================== DATE VALIDATION ====================
+    // ==================== DATE VALIDATION ====================
     // Parse and validate last working day
     const parsedLastWorkingDay = new Date(lastWorkingDay);
     const currentDate = new Date();
@@ -420,11 +420,42 @@ const notifyPayroll = async (termination, employee) => {
   }
 };
 
+// @desc    Bulk delete terminations
+// @route   DELETE /api/terminations/bulk
+// @access  HR only
+const bulkDeleteTerminations = async (req, res) => {
+  try {
+    const { terminationIds } = req.body;
+
+    if (!terminationIds || terminationIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No terminations selected for deletion'
+      });
+    }
+
+    const result = await Termination.deleteMany({ _id: { $in: terminationIds } });
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} termination(s) deleted successfully`
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete termination error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+};
+
 module.exports = {
   initiateTermination,
   submitFeedback,
   approveTermination,
   getAllTerminations,
   getTerminationById,
-  deleteTermination
+  deleteTermination,
+  bulkDeleteTerminations // 👈 Added this
 };

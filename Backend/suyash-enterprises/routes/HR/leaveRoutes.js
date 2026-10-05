@@ -9,10 +9,10 @@ const {
   getLeaveBalance,
   getLeaveReport,
   updateLeave,
-  deleteLeave
+  deleteLeave,
+  bulkDeleteLeaves // 👈 Import the new function
 } = require('../../controllers/HR/leaveController');
 const { protect } = require('../../middleware/authMiddleware');
-
 
 router.use(protect);
 
@@ -434,6 +434,52 @@ router.get('/employee/:employeeId/balance', getLeaveBalance);
  *         description: Missing date parameters
  */
 router.get('/report', getLeaveReport);
+
+/**
+ * @swagger
+ * /api/leaves/bulk:
+ *   delete:
+ *     summary: Bulk delete leave applications
+ *     tags: [Leaves]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - leaveIds
+ *             properties:
+ *               leaveIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["60d21b4667d0d8992e610c87", "60d21b4667d0d8992e610c88"]
+ *     responses:
+ *       200:
+ *         description: Leave applications deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "2 leave application(s) deleted successfully"
+ *       400:
+ *         description: No leaves selected for deletion
+ *       500:
+ *         description: Server error
+ *
+ * ⚠️ IMPORTANT: This route MUST come before /:id
+ *    Otherwise, Express will treat "bulk" as a leave ID.
+ */
+router.delete('/bulk', bulkDeleteLeaves);
 
 /**
  * @swagger

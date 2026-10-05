@@ -180,8 +180,6 @@ class ProductionController {
         .populate('EmployeeID', 'EmployeeID FirstName LastName')
         .populate('VerifiedBy', 'EmployeeID FirstName LastName')
         .populate('ApprovedBy', 'EmployeeID FirstName LastName')
-        //  Optionally populate rateMasterId if you want to show rate details
-        // .populate('rateMasterId', 'productType operation ratePerUnit uom')
         .sort({ Date: -1 })
         .limit(parseInt(limit))
         .skip(skip);
@@ -582,8 +580,6 @@ class ProductionController {
       
       const productions = await Production.find(query)
         .populate('EmployeeID', 'EmployeeID FirstName LastName EmploymentType')
-        //  Optionally populate rateMasterId for rate history
-        // .populate('rateMasterId', 'productType operation ratePerUnit uom')
         .sort({ EmployeeID: 1, Date: 1 });
       
       // Group by employee
@@ -675,6 +671,34 @@ class ProductionController {
     });
   }
 }
+
+  // ✅ BULK DELETE PRODUCTION RECORDS (NEW METHOD - Added inside the class)
+  async bulkDeleteProduction(req, res) {
+    try {
+      const { productionIds } = req.body;
+
+      if (!productionIds || productionIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No production records selected for deletion'
+        });
+      }
+
+      const result = await Production.deleteMany({ _id: { $in: productionIds } });
+
+      return res.status(200).json({
+        success: true,
+        message: `${result.deletedCount} production record(s) deleted successfully`
+      });
+
+    } catch (error) {
+      console.error('❌ Bulk delete production error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Server error: ' + error.message
+      });
+    }
+  }
 }
 
 module.exports = new ProductionController();

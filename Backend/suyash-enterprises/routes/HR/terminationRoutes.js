@@ -6,10 +6,12 @@ const {
   approveTermination,
   getAllTerminations,
   getTerminationById,
-  deleteTermination
+  deleteTermination,
+  bulkDeleteTerminations // 👈 Import the new function
 } = require('../../controllers/HR/terminationController');
 const { protect } = require('../../middleware/authMiddleware');
 const { authorize } = require('../../middleware/roleMiddleware')
+
 // All routes require authentication
 router.use(protect);
 
@@ -338,6 +340,54 @@ router.get('/', getAllTerminations);
  *         description: Server error
  */
 router.post('/initiate', initiateTermination);
+
+/**
+ * @swagger
+ * /api/terminations/bulk:
+ *   delete:
+ *     summary: Bulk delete termination records
+ *     tags: [Terminations]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - terminationIds
+ *             properties:
+ *               terminationIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["65a1b2c3d4e5f6a7b8c9d0e1", "65a1b2c3d4e5f6a7b8c9d0e2"]
+ *     responses:
+ *       200:
+ *         description: Terminations deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "2 termination(s) deleted successfully"
+ *       400:
+ *         description: Bad request - No terminations selected
+ *       401:
+ *         description: Not authorized
+ *       500:
+ *         description: Server error
+ * 
+ * ⚠️ IMPORTANT: This route MUST come before /:terminationId
+ *    Otherwise, Express will treat "bulk" as a terminationId.
+ */
+router.delete('/bulk', bulkDeleteTerminations);
 
 /**
  * @swagger

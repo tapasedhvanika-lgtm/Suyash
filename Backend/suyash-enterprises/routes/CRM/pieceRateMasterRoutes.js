@@ -205,6 +205,59 @@ router.get('/', pieceRateMasterController.getAllPieceRates);
 
 /**
  * @swagger
+ * /api/piece-rate-master/active:
+ *   get:
+ *     summary: Get active piece rates (for dropdowns)
+ *     tags: [PieceRateMaster]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Active piece rates retrieved successfully
+ */
+router.get('/active', pieceRateMasterController.getActiveRates);
+
+/**
+ * @swagger
+ * /api/piece-rate-master/bulk:
+ *   delete:
+ *     summary: Bulk delete piece rates (Admin/HR only)
+ *     tags: [PieceRateMaster]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - ids
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["65f1a2b3c4d5e6f7a8b9c0d1", "65f1a2b3c4d5e6f7a8b9c0d2"]
+ *     responses:
+ *       200:
+ *         description: Piece rates deleted/deactivated successfully
+ *       400:
+ *         description: No valid IDs provided
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Forbidden - insufficient permissions
+ */
+// ✅ NEW: Bulk delete route MUST come BEFORE /:id routes
+router.delete(
+  '/bulk',
+  authorize('SuperAdmin', 'HR'),
+  pieceRateMasterController.bulkDeletePieceRates
+);
+
+/**
+ * @swagger
  * /api/piece-rate-master/{id}:
  *   get:
  *     summary: Get piece rate by ID

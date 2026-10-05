@@ -19,25 +19,27 @@ const { validate, candidateValidation, validateId } = require('../../middleware/
 
 router.use(protect);
 
+// ✅ Bulk delete MUST come before /:id routes
+router.delete('/bulk', bulkDeleteCandidates);
+
 router.route('/')
   .get(getCandidates)
-  .post( validate(candidateValidation), addCandidate);
+  .post(validate(candidateValidation), addCandidate);
 
 router.post('/upload-resume', upload.single('resume'), uploadResume);
 
 router.route('/:id')
   .get(validate(validateId), getCandidateById)
-  .put(updateCandidate); 
+  .put(updateCandidate)
+  .delete(validate(validateId), deleteCandidate); // ✅ Moved single delete here
 
 router.put('/:id/resume', 
   upload.single('resume'), 
   updateCandidateResume
 ); 
 
-router.put('/:id/status', validate(validateId),  updateCandidateStatus);
+router.put('/:id/status', validate(validateId), updateCandidateStatus);
 router.post('/:id/notes', validate(validateId), addCandidateNote);
-router.post('/:id/shortlist', validate(validateId),  shortlistCandidate);
+router.post('/:id/shortlist', validate(validateId), shortlistCandidate);
 
 module.exports = router;
-router.delete('/:id', validateId, deleteCandidate);
-router.post('/bulk-delete', bulkDeleteCandidates);

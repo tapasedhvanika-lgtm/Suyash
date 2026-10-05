@@ -530,6 +530,98 @@ async createPieceRate(req, res) {
   }
 
   /**
+   * ✅ NEW: Bulk delete piece rates
+   * DELETE /api/piece-rate-master/bulk
+   * Deletes multiple piece rates in one call.
+   * If a rate is used in production records, it will be deactivated instead of deleted.
+   */
+  async bulkDeletePieceRates(req, res) {
+    try {
+      const { ids } = req.body;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No piece rates selected for deletion'
+        });
+      }
+
+      // Filter to only valid ObjectIds
+      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+      if (validIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No valid piece rate IDs provided'
+        });
+      }
+
+      // Find all selected piece rates
+      const pieceRates = await PieceRateMaster.find({ _id: { $in: validIds } });
+
+      if (pieceRates.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No piece rates found with the given IDs'
+        });
+      }
+
+      // Check which ones are used in production
+      const Production = require('../../models/HR/Production');
+      const usedInProduction = await Production.find({
+        rateMasterId: { $in: validIds },
+        Status: { $in: ['Approved', 'Verified'] }
+      }).select('rateMasterId').lean();
+
+      const usedIds = new Set(usedInProduction.map(p => p.rateMasterId.toString()));
+
+      const deletable = [];
+      const deactivatable = [];
+
+      pieceRates.forEach(rate => {
+        if (usedIds.has(rate._id.toString())) {
+          deactivatable.push(rate._id);
+        } else {
+          deletable.push(rate._id);
+        }
+      });
+
+      let deletedCount = 0;
+      let deactivatedCount = 0;
+
+      // Hard delete the ones not used in production
+      if (deletable.length > 0) {
+        const result = await PieceRateMaster.deleteMany({ _id: { $in: deletable } });
+        deletedCount = result.deletedCount;
+      }
+
+      // Soft delete (deactivate) the ones used in production
+      if (deactivatable.length > 0) {
+        const result = await PieceRateMaster.updateMany(
+          { _id: { $in: deactivatable } },
+          { $set: { isActive: false, updatedBy: req.user._id } }
+        );
+        deactivatedCount = result.modifiedCount;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: `${deletedCount} piece rate(s) deleted successfully, ${deactivatedCount} deactivated (in use)`,
+        deletedCount,
+        deactivatedCount
+      });
+
+    } catch (error) {
+      console.error('Bulk delete piece rate error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * Get active piece rates (for dropdowns)
    * GET /api/piece-rate-master/active
    */

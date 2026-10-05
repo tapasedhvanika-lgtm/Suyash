@@ -40,6 +40,19 @@ router.get('/policies/renewal-report',
 );
 
 /**
+ * @route   DELETE /api/mediclaim/policies/bulk-delete
+ * @desc    Bulk delete multiple policies
+ * @access  HR only
+ * 
+ * ⚠️ IMPORTANT: This route MUST come before /policies/:id
+ *    Otherwise, Express will treat "bulk-delete" as a policy ID.
+ */
+router.delete('/policies/bulk-delete', 
+  protect, 
+  policyController.bulkDeletePolicies
+);
+
+/**
  * @route   GET /api/mediclaim/policies/:id
  * @desc    Get policy by ID with enrollments and claims
  * @access  HR, Manager
