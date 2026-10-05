@@ -1827,6 +1827,7 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
 
   // Form data
   const [formData, setFormData] = useState({
+    so_id: '',
     vendor_id: '',
     nature_of_processing: 'Chamfer',
     ship_to: {
@@ -1906,7 +1907,7 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
             so_item_id: item._id || '',
             part_no: item.part_no || '',
             part_name: item.part_name || '',
-            hsn_code: '',
+            hsn_code: item.hsn_code || '',
             dispatch_qty: '',
             unit: 'Nos',
             unit_price: '',
@@ -2320,6 +2321,7 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
       const token = localStorage.getItem('token');
 
       const requestData = {
+        so_id: formData.so_id || undefined,
         vendor_id: formData.vendor_id,
         nature_of_processing: formData.nature_of_processing,
         ship_to: {

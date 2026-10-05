@@ -1772,7 +1772,7 @@ exports.getAllVendors = async (req, res) => {
       .limit(parseInt(limit))
       .populate('avl_approved_by', 'Username Email')
       .populate('blacklisted_by', 'Username Email')
-      .populate('avl_items', 'part_no part_name item_id part_description'); // 👈 Populate item details
+      .populate('avl_items', 'part_no part_name item_id part_description hsn_code'); // 👉 Populate item details // 👈 Populate item details
 
     const total = await Vendor.countDocuments(filter);
 
