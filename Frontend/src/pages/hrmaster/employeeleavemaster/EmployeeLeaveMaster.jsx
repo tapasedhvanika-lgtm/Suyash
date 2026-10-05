@@ -1640,6 +1640,9 @@ const EmployeeLeaveMaster = () => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
   
+  // ✅ NEW: Bulk delete loading state
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  
   // Notification state
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -1892,9 +1895,54 @@ const EmployeeLeaveMaster = () => {
     setSelected(newSelected);
   };
 
-  const handleBulkDelete = () => {
+  // ✅ UPDATED: Handle bulk delete — now calls the actual API
+  const handleBulkDelete = async () => {
     if (selected.length === 0 || !canDelete) return;
-    showNotification(`Bulk delete for ${selected.length} items - API implementation required`, 'warning');
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selected.length} leave application(s)? This action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setBulkDeleteLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await axios.delete(`${BASE_URL}/api/leaves/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { leaveIds: selected } // DELETE with body
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} leave application(s) deleted successfully`,
+          'success'
+        );
+
+        // Remove deleted rows from local state immediately for a snappy UI
+        const selectedIds = [...selected];
+        setLeaves(prev => prev.filter(l => !selectedIds.includes(l._id)));
+        setFilteredLeaves(prev => prev.filter(l => !selectedIds.includes(l._id)));
+        setSelected([]);
+
+        // Then refresh from server to stay in sync
+        fetchEmployeeLeaves();
+      } else {
+        showNotification(response.data.message || 'Failed to delete leave applications', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Server error during bulk delete',
+        'error'
+      );
+    } finally {
+      setBulkDeleteLoading(false);
+    }
   };
 
   const handleChangePage = (event, newPage) => {
@@ -2251,13 +2299,18 @@ const EmployeeLeaveMaster = () => {
                 </Stack>
 
                 <Stack direction="row" spacing={1.5}>
-                  {/* Bulk Delete Button - Only show if user has delete permission */}
+                  {/* ✅ Bulk Delete Button - now calls API */}
                   {canDelete && selected.length > 0 && (
                     <Button
                       variant="outlined"
                       color="error"
-                      startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                      startIcon={
+                        bulkDeleteLoading 
+                          ? <CircularProgress size={16} color="inherit" />
+                          : <DeleteIcon sx={{ fontSize: '1rem' }} />
+                      }
                       onClick={handleBulkDelete}
+                      disabled={loading || bulkDeleteLoading}
                       sx={{ 
                         height: 36,
                         borderRadius: 1.5,
@@ -2271,9 +2324,8 @@ const EmployeeLeaveMaster = () => {
                           bgcolor: '#fee2e2'
                         }
                       }}
-                      disabled={loading}
                     >
-                      Delete ({selected.length})
+                      {bulkDeleteLoading ? 'Deleting...' : `Delete (${selected.length})`}
                     </Button>
                   )}
                   

@@ -2761,6 +2761,59 @@ const SalaryMaster = () => {
     }
   };
 
+  // ✅ NEW: Handle Bulk Delete
+  const handleBulkDelete = async () => {
+    if (!canDelete && !isSuperAdmin) {
+      showNotification("You do not have permission to delete salaries", "error");
+      return;
+    }
+
+    if (selected.length === 0) {
+      showNotification("No salary records selected for deletion", "error");
+      return;
+    }
+
+    try {
+      setBulkActionLoading(true);
+      const token = localStorage.getItem("token");
+
+      const response = await axios.delete(`${BASE_URL}/api/salaries/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { salaryIds: selected } // DELETE with body
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} salary record(s) deleted successfully`,
+          'success'
+        );
+
+        // Remove deleted rows from local state immediately
+        const selectedIds = [...selected];
+        setSalaries(prev => prev.filter(s => !selectedIds.includes(s._id)));
+        setSelected([]);
+        setOpenBulkDelete(false);
+
+        // Refresh from server to get the latest
+        fetchSalaries();
+      } else {
+        showNotification(response.data.message || 'Failed to delete salaries', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Failed to delete salary records',
+        'error'
+      );
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   const handleSelectAll = (event) => {
     if (!canDelete && !canApprove && !isSuperAdmin) return;
     
@@ -3657,6 +3710,7 @@ const SalaryMaster = () => {
           <Button
             variant="contained"
             color="error"
+            onClick={handleBulkDelete}
             disabled={bulkActionLoading}
             startIcon={bulkActionLoading ? <CircularProgress size={20} /> : <DeleteIcon sx={{ fontSize: '1rem' }} />}
             sx={{

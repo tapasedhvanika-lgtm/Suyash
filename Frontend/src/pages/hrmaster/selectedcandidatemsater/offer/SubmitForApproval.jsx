@@ -1,7 +1,6 @@
 // src/components/OfferManagement/SubmitForApproval.jsx
 import React, { useState, useEffect } from 'react';
 import {
-  // Layout components
   Dialog,
   DialogTitle,
   DialogContent,
@@ -18,24 +17,16 @@ import {
   Box,
   Divider,
   Alert,
-
-  // Form components
   TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Chip,
-
-  // Feedback components
   CircularProgress,
   Snackbar,
-
-  // Buttons and actions
   Button,
   IconButton,
-
-  // Surfaces
   styled,
 } from '@mui/material';
 import {
@@ -119,37 +110,27 @@ const SubmitForApproval = ({ open, onClose, onComplete, candidateData = null }) 
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [stepErrors, setStepErrors] = useState({});
 
-  // Snackbar state
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
 
-  // Steps definition
   const steps = ['Select Offer', 'CTC Breakdown', 'Terms & Confirmation'];
 
-  // Get auth token
   const getAuthToken = () => {
     return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
   };
 
-  // Show snackbar helper
   const showSnackbar = (message, severity = 'success') => {
-    setSnackbar({
-      open: true,
-      message,
-      severity
-    });
+    setSnackbar({ open: true, message, severity });
   };
 
-  // Close snackbar
   const handleCloseSnackbar = (event, reason) => {
     if (reason === 'clickaway') return;
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // Reset all state when dialog closes
   const resetState = () => {
     setActiveStep(0);
     setRemarks('');
@@ -165,23 +146,16 @@ const SubmitForApproval = ({ open, onClose, onComplete, candidateData = null }) 
     setFetchingData(false);
   };
 
-  // Fetch candidate details and offers when component opens
   useEffect(() => {
     if (open && candidateData) {
       console.log('Dialog opened with candidate data:', candidateData);
-
-      // Reset state first
       resetState();
-
-      // Set candidate info from the passed data
       setCandidateInfo(candidateData);
-
-      // Fetch offers for this candidate
       fetchCandidateOffers(candidateData._id || candidateData.id);
     }
   }, [open, candidateData]);
 
-  // Fetch candidate offers using the correct API endpoint
+  // ✅ FIXED: Balanced try/catch/finally + lenient offer filter
   const fetchCandidateOffers = async (candidateId) => {
     setFetchingData(true);
     setError('');
@@ -193,22 +167,25 @@ const SubmitForApproval = ({ open, onClose, onComplete, candidateData = null }) 
       const candidateApiUrl = `${BASE_URL}/api/candidates?_id=${candidateId}`;
       console.log('Fetching candidate details from:', candidateApiUrl);
 
-      const candidateResponse = await axios.get(candidateApiUrl, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json'
+      try {
+        const candidateResponse = await axios.get(candidateApiUrl, {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('Candidate details response:', candidateResponse.data);
+
+        if (candidateResponse.data && candidateResponse.data.length > 0) {
+          const candidateDetails = candidateResponse.data[0];
+          setCandidateInfo(candidateDetails);
         }
-      });
-
-      console.log('Candidate details response:', candidateResponse.data);
-
-      if (candidateResponse.data && candidateResponse.data.length > 0) {
-        const candidateDetails = candidateResponse.data[0];
-        setCandidateInfo(candidateDetails);
+      } catch (candidateErr) {
+        console.log('Could not fetch additional candidate details:', candidateErr.message);
       }
 
       // Now fetch all offers and filter by candidateId
-      // Try different API endpoints to find offers for this candidate
       let offersArray = [];
 
       // Try 1: Fetch all offers and filter
@@ -263,45 +240,40 @@ const SubmitForApproval = ({ open, onClose, onComplete, candidateData = null }) 
 
       console.log('Final offers array:', offersArray);
 
-      // Filter for initiated offers
+      // ✅ FIXED: Lenient filter - include any offer that is NOT already past the initiated stage
       const initiatedOffers = offersArray.filter(offer => {
         if (!offer) return false;
-        const status = (offer.status || '').toLowerCase();
-       
-        const offerStatus = offer.offerStatus?.toLowerCase() || '';
-        const applicationStatus = offer.applicationStatus?.toLowerCase() || '';
-        const workflowStatus = offer.workflowStatus?.toLowerCase() || '';
 
-          // Check if any of the status fields indicate initiated/draft
-  const isInitiated = 
-    status === 'initiated' || 
-    status === 'draft' ||
-    offerStatus === 'initiated' || 
-    offerStatus === 'draft' ||
-    applicationStatus === 'initiated' || 
-    applicationStatus === 'draft' ||
-    workflowStatus === 'initiated' || 
-    workflowStatus === 'draft';
+        const status = (offer.status || '').toLowerCase().trim();
+        const offerStatus = (offer.offerStatus || '').toLowerCase().trim();
+        const applicationStatus = (offer.applicationStatus || '').toLowerCase().trim();
+        const workflowStatus = (offer.workflowStatus || '').toLowerCase().trim();
 
-     // Log for debugging
-  if (offer.offerId || offer._id) {
-    console.log(`Offer ${offer.offerId || offer._id} status check:`, {
-      status,
-      offerStatus,
-      applicationStatus,
-      workflowStatus,
-      isInitiated
-    });
-  }
-  
-  return isInitiated;
-});
+        // Statuses that are already past "initiated"
+        const lockedStatuses = ['pending_approval', 'submitted', 'approved', 'rejected', 'sent', 'accepted', 'declined', 'expired'];
 
-console.log('Initiated offers found:', initiatedOffers);
+        const allStatuses = [status, offerStatus, applicationStatus, workflowStatus].filter(Boolean);
 
+        // If no status field exists at all, assume it's still initiated
+        if (allStatuses.length === 0) {
+          console.log('Offer has no status field, treating as initiated:', offer.offerId || offer._id);
+          return true;
+        }
+
+        const isLocked = allStatuses.some(s => lockedStatuses.includes(s));
+
+        console.log(`Offer ${offer.offerId || offer._id} status check:`, {
+          allStatuses,
+          isLocked,
+          willInclude: !isLocked
+        });
+
+        return !isLocked;
+      });
+
+      console.log('Initiated offers found:', initiatedOffers);
 
       if (initiatedOffers.length > 0) {
-        // Sort by creation date (newest first)
         const sortedOffers = [...initiatedOffers].sort((a, b) => {
           const dateA = new Date(a.createdAt || a.createdDate || a.updatedAt || 0);
           const dateB = new Date(b.createdAt || b.createdDate || b.updatedAt || 0);
@@ -315,8 +287,6 @@ console.log('Initiated offers found:', initiatedOffers);
         setCandidateOffers([]);
         setSelectedOffer(null);
         showSnackbar('No initiated offers found for this candidate', 'warning');
-
-        // Log the full offers array for debugging
         console.log('All offers found:', offersArray);
       }
     } catch (err) {
@@ -327,6 +297,7 @@ console.log('Initiated offers found:', initiatedOffers);
       setFetchingData(false);
     }
   };
+
   const handleOfferSelect = (offerId) => {
     const offer = candidateOffers.find(o => o._id === offerId || o.id === offerId);
     if (offer) {
@@ -340,7 +311,6 @@ console.log('Initiated offers found:', initiatedOffers);
     handleOfferSelect(e.target.value);
   };
 
-  // Validate current step
   const validateStep = (step) => {
     const errors = {};
 
@@ -383,8 +353,6 @@ console.log('Initiated offers found:', initiatedOffers);
     onClose();
   };
 
-  // In SubmitForApproval.jsx, update the handleSubmitForApproval function:
-
   const handleSubmitForApproval = async () => {
     if (!validateStep(2)) {
       setError('Please confirm before submitting');
@@ -404,11 +372,8 @@ console.log('Initiated offers found:', initiatedOffers);
 
     try {
       const token = getAuthToken();
-
-      // Construct the API URL: POST {{base_url}}/api/offers/{{offer_id}}/submit-approval
       const apiUrl = `${BASE_URL}/api/offers/${offerId}/submit-approval`;
       console.log('Submitting for approval to:', apiUrl);
-      console.log('Request body:', { remarks });
 
       const response = await axios.post(
         apiUrl,
@@ -428,12 +393,11 @@ console.log('Initiated offers found:', initiatedOffers);
         setSuccess(response.data.message || 'Offer submitted for approval successfully!');
         showSnackbar(response.data.message || 'Offer submitted for approval successfully!', 'success');
 
-        // Prepare updated data for parent component with the new status
         const updatedData = {
-          _id: offerId,  // Use _id for consistency
+          _id: offerId,
           id: offerId,
           offerId: response.data.data?.offerId || selectedOffer.offerId,
-          status: 'pending_approval', // Force the status to pending_approval
+          status: 'pending_approval',
           approvalFlowId: response.data.data?.approvalFlowId,
           candidateId: candidateInfo?._id || candidateInfo?.id,
           candidateName: candidateInfo?.name || `${candidateInfo?.firstName || ''} ${candidateInfo?.lastName || ''}`.trim(),
@@ -442,12 +406,10 @@ console.log('Initiated offers found:', initiatedOffers);
 
         console.log('Sending updated data to parent:', updatedData);
 
-        // Call onComplete with the updated data
         if (onComplete) {
           onComplete(updatedData);
         }
 
-        // Wait a moment to show success message before closing
         setTimeout(() => {
           resetState();
           onClose();
@@ -512,48 +474,34 @@ console.log('Initiated offers found:', initiatedOffers);
     }
   };
 
-  // Get CTC details from selected offer
   const getCtcDetails = () => {
     if (!selectedOffer) return null;
-
-    // Check different possible paths for CTC details
-    if (selectedOffer.ctcDetails) {
-      return selectedOffer.ctcDetails;
-    } else if (selectedOffer.ctc) {
-      return selectedOffer.ctc;
-    } else if (selectedOffer.compensation) {
-      return selectedOffer.compensation;
-    }
-
+    if (selectedOffer.ctcDetails) return selectedOffer.ctcDetails;
+    if (selectedOffer.ctc) return selectedOffer.ctc;
+    if (selectedOffer.compensation) return selectedOffer.compensation;
     return null;
   };
 
-  // Get position from selected offer
   const getPosition = () => {
     if (!selectedOffer) return 'Not Specified';
-
     if (selectedOffer.position) return selectedOffer.position;
     if (selectedOffer.jobTitle) return selectedOffer.jobTitle;
     if (selectedOffer.designation) return selectedOffer.designation;
     if (selectedOffer.job?.title) return selectedOffer.job.title;
-
     return 'Not Specified';
   };
 
-  // Get joining date from selected offer
   const getJoiningDate = () => {
     if (!selectedOffer) return null;
-
     return selectedOffer.joiningDate ||
       selectedOffer.offerDetails?.joiningDate ||
       selectedOffer.expectedJoiningDate;
   };
 
-  // Render success response data
   const renderResponseData = () => {
     if (!responseData) return null;
 
-    const { data, message } = responseData;
+    const { data } = responseData;
 
     return (
       <Paper sx={{
@@ -602,13 +550,8 @@ console.log('Initiated offers found:', initiatedOffers);
     );
   };
 
-  // Render step content
   const renderStepContent = (step) => {
     switch (step) {
-      // Updated Step 0 component for SubmitForApproval.jsx
-
-      // Replace the case 0 in renderStepContent with this:
-
       case 0:
         return (
           <Paper sx={{ p: 2, bgcolor: '#FFFFFF', borderRadius: 1, border: '1px solid #E0E0E0' }}>
@@ -622,7 +565,6 @@ console.log('Initiated offers found:', initiatedOffers);
               </Box>
             ) : (
               <>
-                {/* Candidate Info in one line */}
                 {candidateInfo && (
                   <Box sx={{
                     mb: 2,
@@ -654,10 +596,8 @@ console.log('Initiated offers found:', initiatedOffers);
                   </Box>
                 )}
 
-                {/* Hidden select field - but we'll show a read-only view instead */}
                 {candidateOffers.length > 0 ? (
                   <>
-                    {/* Hidden select for form value (not visible to user) */}
                     <select
                       style={{ display: 'none' }}
                       value={selectedOffer?._id || selectedOffer?.id || ''}
@@ -669,35 +609,6 @@ console.log('Initiated offers found:', initiatedOffers);
                         </option>
                       ))}
                     </select>
-
-                    {/* Read-only offer selection info */}
-                    {/* <Box sx={{ 
-                mb: 2, 
-                p: 1.5, 
-                bgcolor: '#F5F5F5', 
-                borderRadius: 1,
-                border: '1px solid #E0E0E0'
-              }}>
-                <Typography variant="caption" color="textSecondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                  <InfoIcon fontSize="small" sx={{ fontSize: 16 }} />
-                  Latest offer automatically selected (read-only)
-                </Typography>
-                
-                <FormControl fullWidth size="small" disabled>
-                  <InputLabel>Selected Offer</InputLabel>
-                  <Select
-                    value={selectedOffer?._id || selectedOffer?.id || ''}
-                    label="Selected Offer"
-                    disabled
-                  >
-                    {candidateOffers.map((offer) => (
-                      <MenuItem key={offer._id || offer.id} value={offer._id || offer.id}>
-                        {offer.offerId || offer._id} (Created: {formatDate(offer.createdAt)})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box> */}
                   </>
                 ) : (
                   !fetchingData && (
@@ -707,7 +618,6 @@ console.log('Initiated offers found:', initiatedOffers);
                   )
                 )}
 
-                {/* Selected Offer Preview - Read Only */}
                 {selectedOffer && (
                   <Box sx={{
                     p: 2,
@@ -781,20 +691,8 @@ console.log('Initiated offers found:', initiatedOffers);
                           {formatDate(getJoiningDate())}
                         </Typography>
                       </Grid>
-
-                      {/* {selectedOffer.applicationId && (
-                  <Grid item xs={6}>
-                    <Typography variant="caption" color="textSecondary" display="block">
-                      Application ID
-                    </Typography>
-                    <Typography variant="body2">
-                      {selectedOffer.applicationId}
-                    </Typography>
-                  </Grid>
-                )} */}
                     </Grid>
 
-                    {/* Show if there are multiple offers */}
                     {candidateOffers.length > 1 && (
                       <Box sx={{ mt: 2, pt: 1, borderTop: '1px dashed #E0E0E0' }}>
                         <Typography variant="caption" color="textSecondary">
@@ -805,7 +703,6 @@ console.log('Initiated offers found:', initiatedOffers);
                   </Box>
                 )}
 
-                {/* Hidden field to maintain form data */}
                 <input
                   type="hidden"
                   name="offerId"
@@ -828,7 +725,6 @@ console.log('Initiated offers found:', initiatedOffers);
 
               {ctcDetails ? (
                 <>
-                  {/* Monthly Components Section */}
                   <Typography variant="caption" sx={{ color: '#1976D2', fontWeight: 600, mb: 1, display: 'block' }}>
                     Monthly Components
                   </Typography>
@@ -889,7 +785,6 @@ console.log('Initiated offers found:', initiatedOffers);
 
                   <Divider sx={{ my: 1 }} />
 
-                  {/* Annual Components Section */}
                   <Typography variant="caption" sx={{ color: '#1976D2', fontWeight: 600, display: 'block' }}>
                     Annual Components
                   </Typography>
@@ -933,7 +828,6 @@ console.log('Initiated offers found:', initiatedOffers);
 
                   <Divider />
 
-                  {/* Total CTC Section */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                     <Typography variant="subtitle2" color="#1976D2">
                       Total CTC (Annual)
@@ -956,7 +850,6 @@ console.log('Initiated offers found:', initiatedOffers);
         const ctcDetailsForPreview = getCtcDetails();
         return (
           <Stack spacing={2}>
-            {/* Preview Section */}
             {selectedOffer && (
               <Paper sx={{ p: 2, bgcolor: '#F8FAFC', borderRadius: 1, border: '1px solid #1976D2' }}>
                 <Typography variant="subtitle2" sx={{ color: '#1976D2', mb: 1.5, fontWeight: 600, fontSize: '0.9rem' }}>
@@ -1024,9 +917,7 @@ console.log('Initiated offers found:', initiatedOffers);
               </Paper>
             )}
 
-            {/* Terms & Conditions Card */}
             <Paper sx={{ p: 2.5, bgcolor: '#FFFFFF', borderRadius: 1, border: '1px solid #E0E0E0' }}>
-              {/* Remarks Section */}
               <Box sx={{ mb: 2.5 }}>
                 <Typography variant="subtitle2" sx={{ color: '#1976D2', fontWeight: 600, fontSize: '0.9rem' }}>
                   Additional Remarks
@@ -1051,7 +942,6 @@ console.log('Initiated offers found:', initiatedOffers);
                 />
               </Box>
 
-              {/* Warning Message */}
               <Box sx={{
                 p: 1.5,
                 bgcolor: '#FFF8E7',
@@ -1075,7 +965,6 @@ console.log('Initiated offers found:', initiatedOffers);
                 Terms & Conditions
               </Typography>
 
-              {/* Confirmation List */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="body2" paragraph sx={{ fontSize: '0.85rem', color: '#424242', mb: 1.5 }}>
                   By submitting this offer for approval, you confirm that:
@@ -1108,7 +997,6 @@ console.log('Initiated offers found:', initiatedOffers);
 
               <Divider />
 
-              {/* Confirmation Checkbox */}
               <Box sx={{
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -1188,7 +1076,6 @@ console.log('Initiated offers found:', initiatedOffers);
           </IconButton>
         </DialogTitle>
 
-        {/* Modern Stepper with Gradient Connector */}
         {!responseData && (
           <Box sx={{ px: 2, pt: 1, backgroundColor: '#F8FAFC' }}>
             <Stepper
@@ -1216,7 +1103,6 @@ console.log('Initiated offers found:', initiatedOffers);
             </Box>
           )}
 
-          {/* Error Messages */}
           {error && (
             <Alert severity="error" sx={{ mt: 2, borderRadius: 1 }} onClose={() => setError('')}>
               {error}
@@ -1303,7 +1189,6 @@ console.log('Initiated offers found:', initiatedOffers);
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

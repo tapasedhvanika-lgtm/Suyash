@@ -970,13 +970,36 @@ const TerminationMaster = () => {
     setSelected([]);
   };
   
-  // Handle bulk delete
-  const handleBulkDelete = () => {
+  // 👇 FIXED: Handle bulk delete
+  const handleBulkDelete = async () => {
     if (!canDelete && !isSuperAdmin) {
       showNotification("You don't have permission to delete terminations", "error");
       return;
     }
-    showNotification('Bulk delete requires API implementation', 'warning');
+    
+    if (selected.length === 0) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(`${BASE_URL}/api/terminations/bulk`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { terminationIds: selected }
+      });
+      
+      if (response.data.success) {
+        showNotification(response.data.message || 'Selected terminations deleted successfully', 'success');
+        setSelected([]);
+        fetchTerminations(); // Refresh the table
+      } else {
+        showNotification(response.data.message || 'Failed to delete terminations', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Failed to delete terminations',
+        'error'
+      );
+    }
   };
   
   // Handle add termination - only if user has create permission

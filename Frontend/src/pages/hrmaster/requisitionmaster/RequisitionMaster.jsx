@@ -1869,9 +1869,11 @@ const RequisitionMaster = () => {
   const [selectedRequisition, setSelectedRequisition] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-    // ⬇️ ADD THESE MISSING STATE DECLARATIONS:
-  const [error, setError] = useState(null);        // Missing this
-  const [totalPages, setTotalPages] = useState(0); // Missing this
+  const [error, setError] = useState(null);
+  const [totalPages, setTotalPages] = useState(0);
+
+  // ✅ NEW: Bulk delete loading state
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
@@ -1899,7 +1901,6 @@ const RequisitionMaster = () => {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
           
-          // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {
             setUserPermissions(userData.permissions);
           } else {
@@ -1921,7 +1922,6 @@ const RequisitionMaster = () => {
 
   // Check permission helper
   const checkPermission = (action) => {
-    // Super admin has all permissions
     if (isSuperAdmin) return true;
     
     return hasPermission(
@@ -1950,7 +1950,6 @@ const RequisitionMaster = () => {
   }, [searchInput]);
 
   const fetchRequisitions = useCallback(async () => {
-    // Only fetch if user has view permission
     if (!canViewPage && !isSuperAdmin) return;
     
     try {
@@ -2048,13 +2047,57 @@ const RequisitionMaster = () => {
     showNotification('Data refreshed', 'success');
   };
 
-  const handleBulkDelete = () => {
+  // ✅ UPDATED: Handle bulk delete — now calls the actual API
+  const handleBulkDelete = async () => {
     if (!canDelete && !isSuperAdmin) {
       showNotification('You do not have permission to delete requisitions', 'error');
       return;
     }
     if (selected.length === 0) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selected.length} requisition(s)? This action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setBulkDeleteLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await axios.delete(`${BASE_URL}/api/requisitions/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { ids: selected } // DELETE with body
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} requisition(s) deleted successfully`,
+          'success'
+        );
+
+        // Remove deleted rows from local state immediately for a snappy UI
+        const selectedIds = [...selected];
+        setRequisitions(prev => prev.filter(r => !selectedIds.includes(r._id)));
+        setSelected([]);
+
+        // Then refresh from server to stay in sync
+        fetchRequisitions();
+      } else {
+        showNotification(response.data.message || 'Failed to delete requisitions', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Server error during bulk delete',
+        'error'
+      );
+    } finally {
+      setBulkDeleteLoading(false);
+    }
   };
 
   const handleActionMenuOpen = (event, requisition) => {
@@ -2216,7 +2259,6 @@ const renderTable = () => (
               py: 1.5
             }
           }}>
-            {/* Checkbox Column - Only show if user has delete permission */}
             {(canDelete || isSuperAdmin) && (
               <TableCell padding="checkbox" sx={{ width: 40 }}>
                 <Checkbox
@@ -2310,7 +2352,6 @@ const renderTable = () => (
                     }
                   }}
                 >
-                  {/* Checkbox Column - Only show if user has delete permission */}
                   {(canDelete || isSuperAdmin) && (
                     <TableCell padding="checkbox" sx={{ width: 40 }}>
                       <Checkbox
@@ -2457,12 +2498,10 @@ const renderTable = () => (
   </Paper>
 );
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage && !isSuperAdmin) {
     return <AccessDenied />;
   }
@@ -2599,13 +2638,18 @@ const renderTable = () => (
           </Stack>
 
           <Stack direction="row" spacing={1.5}>
-            {/* Bulk Delete Button - Only show if user has delete permission */}
+            {/* ✅ Bulk Delete Button - now wired to API */}
             {(canDelete || isSuperAdmin) && selected.length > 0 && (
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                startIcon={
+                  bulkDeleteLoading 
+                    ? <CircularProgress size={16} color="inherit" />
+                    : <DeleteIcon sx={{ fontSize: '1rem' }} />
+                }
                 onClick={handleBulkDelete}
+                disabled={loading || bulkDeleteLoading}
                 sx={{ 
                   height: 36,
                   borderRadius: 1.5,
@@ -2617,7 +2661,7 @@ const renderTable = () => (
                   '&:hover': { borderColor: '#fecaca', bgcolor: '#fee2e2' }
                 }}
               >
-                Delete ({selected.length})
+                {bulkDeleteLoading ? 'Deleting...' : `Delete (${selected.length})`}
               </Button>
             )}
 

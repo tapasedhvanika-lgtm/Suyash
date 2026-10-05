@@ -1416,6 +1416,7 @@ const PolicyMaster = () => {
     showNotification('Policy deleted successfully!', 'success');
   };
 
+  // Handle bulk delete - FIXED
   const handleBulkDelete = async () => {
     if (!canDelete && !isSuperAdmin) {
       showNotification("You don't have permission to delete policies", "error");
@@ -1426,15 +1427,26 @@ const PolicyMaster = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${BASE_URL}/api/mediclaim/policies/bulk-delete`, {
-        data: { ids: selected },
+      const response = await axios.delete(`${BASE_URL}/api/mediclaim/policies/bulk-delete`, {
+        // ✅ FIXED: Changed 'ids' to 'policyIds' to match the backend controller
+        data: { policyIds: selected },
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSelected([]);
-      fetchPolicies();
-      showNotification('Selected policies deleted successfully', 'success');
+      
+      if (response.data.success) {
+        setSelected([]);
+        fetchPolicies();
+        showNotification(response.data.message || 'Selected policies deleted successfully', 'success');
+      } else {
+        showNotification(response.data.message || 'Failed to delete policies', 'error');
+      }
     } catch (error) {
-      showNotification('Bulk delete failed', 'error');
+      console.error('Bulk delete error:', error);
+      // ✅ FIXED: Now shows the real error from the backend (e.g., "Cannot delete policy with enrollments")
+      showNotification(
+        error.response?.data?.message || 'Failed to delete policies',
+        'error'
+      );
     }
   };
 

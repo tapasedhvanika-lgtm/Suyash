@@ -6567,17 +6567,14 @@ const COLORS = {
 const parseDateString = (dateString) => {
   if (!dateString) return null;
   
-  // Check if it's already a valid Date object
   if (dateString instanceof Date) return dateString;
   
-  // Check if it's in DD/MM/YYYY format
   if (typeof dateString === 'string' && dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
     const [day, month, year] = dateString.split('/');
     const parsedDate = new Date(year, month - 1, day);
     return isNaN(parsedDate.getTime()) ? null : parsedDate;
   }
   
-  // Try standard date parsing for ISO format or other formats
   const parsedDate = new Date(dateString);
   return isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
@@ -6611,7 +6608,6 @@ const ActionMenu = ({ item, onView, onEdit, onDelete, onComplete, onDownload, an
   const canDelete = hasPermission(permissions, moduleKey, pageKey, ACTIONS.DELETE);
   const canCreate = hasPermission(permissions, moduleKey, pageKey, ACTIONS.CREATE);
 
-  // If no actions available, don't render the menu
   if (!canView && !canUpdate && !canDelete && !(mode === 'assign' && canCreate)) {
     return null;
   }
@@ -6729,7 +6725,6 @@ const ActionMenu = ({ item, onView, onEdit, onDelete, onComplete, onDownload, an
               </MenuItem>
             )}
             
-            {/* Download Certificate Option - Only show for completed trainings with certificate */}
             {item?.status?.toLowerCase() === 'completed' && item?.certificateFile && (
               <>
                 <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />
@@ -6759,10 +6754,8 @@ const ActionMenu = ({ item, onView, onEdit, onDelete, onComplete, onDownload, an
 };
 
 const TrainingRecordMaster = () => {
-  // Mode state
   const [mode, setMode] = useState('add');
   
-  // State for data
   const [trainings, setTrainings] = useState([]);
   const [assignedTrainings, setAssignedTrainings] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -6771,33 +6764,27 @@ const TrainingRecordMaster = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
   
-  // Table state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selected, setSelected] = useState([]);
   
-  // Menu state
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedItemForAction, setSelectedItemForAction] = useState(null);
   
-  // Modal state
   const [openAddModal, setOpenAddModal] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [openViewModal, setOpenViewModal] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openAssignModal, setOpenAssignModal] = useState(false);
   
-  // Selected item
   const [selectedItem, setSelectedItem] = useState(null);
   
-  // Notification state
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
 
-  // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
@@ -6808,9 +6795,7 @@ const TrainingRecordMaster = () => {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.get(`${BASE_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.data.success) {
@@ -6834,18 +6819,11 @@ const TrainingRecordMaster = () => {
     fetchUserPermissions();
   }, []);
 
-  // Check permission helper
   const checkPermission = (action) => {
     if (isSuperAdmin) return true;
-    return hasPermission(
-      userPermissions,
-      MODULES.TRAINING_MASTER,
-      PAGES.TRAINING_RECORDS,
-      action
-    );
+    return hasPermission(userPermissions, MODULES.TRAINING_MASTER, PAGES.TRAINING_RECORDS, action);
   };
 
-  // Permission checks
   const canViewPage = checkPermission(ACTIONS.VIEW);
   const canCreate = checkPermission(ACTIONS.CREATE);
   const canUpdate = checkPermission(ACTIONS.UPDATE);
@@ -6975,7 +6953,6 @@ const TrainingRecordMaster = () => {
     }
   };
   
-  // Handle refresh
   const handleRefresh = () => {
     if (mode === 'add') {
       fetchTrainings();
@@ -6985,14 +6962,12 @@ const TrainingRecordMaster = () => {
     showNotification('Data refreshed', 'success');
   };
   
-  // Handle mode change
   const handleModeChange = (event, newMode) => {
     if (newMode !== null) {
       setMode(newMode);
     }
   };
   
-  // Handle search
   const handleSearch = () => {
     const currentData = mode === 'add' ? trainings : assignedTrainings;
     
@@ -7023,7 +6998,6 @@ const TrainingRecordMaster = () => {
     handleSearch();
   }, [searchTerm, trainings, assignedTrainings, mode]);
   
-  // Handle select all
   const handleSelectAll = (event) => {
     if (!canDelete || mode !== 'add') return;
     
@@ -7034,7 +7008,6 @@ const TrainingRecordMaster = () => {
     }
   };
   
-  // Handle single selection
   const handleSelect = (id) => {
     if (!canDelete || mode !== 'add') return;
     
@@ -7050,20 +7023,17 @@ const TrainingRecordMaster = () => {
     setSelected(newSelected);
   };
   
-  // Handle page change
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
     setSelected([]);
   };
   
-  // Handle rows per page change
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
     setSelected([]);
   };
   
-  // Handle add training
   const handleAddTraining = (newTrainingFromBackend) => {
     const formattedItem = {
       ...newTrainingFromBackend,
@@ -7082,7 +7052,6 @@ const TrainingRecordMaster = () => {
     showNotification('Training added successfully!', 'success');
   };
   
-  // Handle edit training
   const handleEditTraining = (updatedTrainingFromBackend) => {
     const formattedItem = {
       ...updatedTrainingFromBackend,
@@ -7109,7 +7078,6 @@ const TrainingRecordMaster = () => {
     showNotification('Training updated successfully!', 'success');
   };
   
-  // Handle delete training
   const handleDeleteTraining = (itemId) => {
     const updatedData = trainings.filter(item => item._id !== itemId);
     setTrainings(updatedData);
@@ -7117,13 +7085,11 @@ const TrainingRecordMaster = () => {
     showNotification('Training deleted successfully!', 'success');
   };
   
-  // Handle assign training
   const handleAssignTraining = () => {
     fetchAssignedTrainings();
     showNotification('Training assigned successfully!', 'success');
   };
   
-  // Handle download certificate - FIXED VERSION
   const handleDownloadCertificate = async (training) => {
     if (!training?.certificateFile) {
       showNotification('Certificate file not available', 'error');
@@ -7134,7 +7100,6 @@ const TrainingRecordMaster = () => {
       const token = localStorage.getItem('token');
       let fileUrl = training.certificateFile;
       
-      // Construct proper URL if it's relative
       if (fileUrl && !fileUrl.startsWith('http') && !fileUrl.startsWith('https')) {
         const cleanPath = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
         fileUrl = `${BASE_URL}/${cleanPath}`;
@@ -7142,7 +7107,6 @@ const TrainingRecordMaster = () => {
       
       console.log('Downloading certificate from:', fileUrl);
       
-      // Fetch the file with authentication
       const response = await axios.get(fileUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -7150,7 +7114,6 @@ const TrainingRecordMaster = () => {
         responseType: 'blob'
       });
       
-      // Create blob and trigger download
       const blob = new Blob([response.data], { 
         type: response.headers['content-type'] || 'application/pdf' 
       });
@@ -7158,7 +7121,6 @@ const TrainingRecordMaster = () => {
       const link = document.createElement('a');
       link.href = url;
       
-      // Set filename
       let filename = `certificate_${training.employeeName || 'training'}_${training.trainingName || 'training'}.pdf`;
       const contentDisposition = response.headers['content-disposition'];
       if (contentDisposition) {
@@ -7178,7 +7140,6 @@ const TrainingRecordMaster = () => {
     } catch (err) {
       console.error('Error downloading certificate:', err);
       
-      // Fallback: try opening in new tab
       try {
         const token = localStorage.getItem('token');
         let fileUrl = training.certificateFile;
@@ -7197,7 +7158,6 @@ const TrainingRecordMaster = () => {
     }
   };
   
-  // Handle complete training
   const handleCompleteTraining = async (training) => {
     try {
       const token = localStorage.getItem('token');
@@ -7247,13 +7207,37 @@ const TrainingRecordMaster = () => {
     }
   };
   
-  // Handle bulk delete
-  const handleBulkDelete = () => {
+  // ✅ FIXED: Handle bulk delete
+  const handleBulkDelete = async () => {
     if (!canDelete) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
+    if (selected.length === 0) return;
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(`${BASE_URL}/api/trainings/bulk`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { trainingIds: selected }
+      });
+
+      if (response.data.success) {
+        showNotification(response.data.message || `${selected.length} training(s) deleted successfully`, 'success');
+        setSelected([]);
+        fetchTrainings();
+      } else {
+        showNotification(response.data.message || 'Failed to delete trainings', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Failed to delete trainings',
+        'error'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
   
-  // Action menu handlers
   const handleActionMenuOpen = (event, item) => {
     setActionMenuAnchor(event.currentTarget);
     setSelectedItemForAction(item);
@@ -7264,7 +7248,6 @@ const TrainingRecordMaster = () => {
     setSelectedItemForAction(null);
   };
   
-  // Open edit modal
   const openEditModalHandler = (item) => {
     if (!canUpdate) return;
     setSelectedItem(item);
@@ -7272,7 +7255,6 @@ const TrainingRecordMaster = () => {
     handleActionMenuClose();
   };
   
-  // Open view modal
   const openViewModalHandler = (item) => {
     if (!canViewPage) return;
     setSelectedItem(item);
@@ -7280,7 +7262,6 @@ const TrainingRecordMaster = () => {
     handleActionMenuClose();
   };
   
-  // Open delete confirmation
   const openDeleteDialogHandler = (item) => {
     if (!canDelete) return;
     setSelectedItem(item);
@@ -7288,20 +7269,17 @@ const TrainingRecordMaster = () => {
     handleActionMenuClose();
   };
   
-  // Open complete training
   const openCompleteTrainingHandler = (item) => {
     if (!canCreate) return;
     handleCompleteTraining(item);
     handleActionMenuClose();
   };
   
-  // Open download certificate
   const openDownloadCertificateHandler = (item) => {
     handleDownloadCertificate(item);
     handleActionMenuClose();
   };
   
-  // Show notification
   const showNotification = (message, severity) => {
     setSnackbar({
       open: true,
@@ -7310,7 +7288,6 @@ const TrainingRecordMaster = () => {
     });
   };
   
-  // Format date - Updated to handle DD/MM/YYYY format
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     
@@ -7324,7 +7301,6 @@ const TrainingRecordMaster = () => {
     });
   };
   
-  // Get status chip color
   const getStatusChipColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed':
@@ -7339,7 +7315,6 @@ const TrainingRecordMaster = () => {
     }
   };
   
-  // Get item initials for avatar
   const getItemInitials = (itemName) => {
     if (!itemName) return mode === 'add' ? 'T' : 'A';
     const words = itemName.split(' ');
@@ -7349,7 +7324,6 @@ const TrainingRecordMaster = () => {
     return itemName.substring(0, 2).toUpperCase();
   };
   
-  // Get avatar color
   const getAvatarColor = (itemName) => {
     if (!itemName) return COLORS.primary;
     const colors = [COLORS.primary, COLORS.primaryDark, '#074346', '#0D696C', '#128C7E'];
@@ -7357,7 +7331,6 @@ const TrainingRecordMaster = () => {
     return colors[charCode % colors.length];
   };
   
-  // Paginated data
   const paginatedData = filteredData.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage

@@ -916,39 +916,30 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Paper,
-  IconButton,
-  Tooltip,
   Typography,
   Snackbar,
-  Stack,
-  alpha,
   Alert,
   Tabs,
   Tab,
-  Breadcrumbs,
-  Link,
   CircularProgress
 } from '@mui/material';
 import {
-  Refresh as RefreshIcon,
   Work as WorkIcon,
   Description as DescriptionIcon,
   Security as SecurityIcon,
   CalendarToday as CalendarIcon,
-  HowToReg as HowToRegIcon,
-  Assignment as AssignmentIcon,
-  Info as InfoIcon
+  Assignment as AssignmentIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import BASE_URL from '../../../config/Config';
 import { hasPermission, ACTIONS, MODULES, PAGES } from '../../../utils/modulePermissions';
 
 // Import management components
-// import OfferManagement from './offer/OfferManagement';
 import DocumentManagement from './documents/DocumentManagement';
 import BGVManagement from './BGV/BGVManagement';
 import AppointmentManagement from './appointment/AppointmentManagement';
-import OfferManagement from './offer/OfferManagenent';
+// ✅ Fixed typo: Changed OfferManagenent to OfferManagement
+import OfferManagement from './offer/OfferManagement'; 
 
 // Color constants
 const COLORS = {
@@ -1090,7 +1081,6 @@ const SelectedCandidatesMaster = () => {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
           
-          // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {
             setUserPermissions(userData.permissions);
           } else {
@@ -1111,7 +1101,6 @@ const SelectedCandidatesMaster = () => {
   // Check if user has view permission for the page
   useEffect(() => {
     if (permissionsLoaded) {
-      // Check view permission for SELECTED_CANDIDATES_MASTER module and SELECTED_CANDIDATE page
       const hasViewPermission = hasPermission(
         userPermissions,
         MODULES.SELECTED_CANDIDATES_MASTER,
@@ -1119,24 +1108,12 @@ const SelectedCandidatesMaster = () => {
         ACTIONS.VIEW
       );
       
-      // Super admin has all permissions
       setCanViewPage(isSuperAdmin || hasViewPermission);
     }
   }, [permissionsLoaded, userPermissions, isSuperAdmin]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
-  };
-
-  const handleRefresh = () => {
-    const currentTab = TABS[tabValue]?.value;
-    if (currentTab) {
-      setRefreshTriggers(prev => ({
-        ...prev,
-        [currentTab]: prev[currentTab] + 1
-      }));
-      showNotification('Data refreshed successfully', 'success');
-    }
   };
 
   const showNotification = (message, severity) => {
@@ -1169,12 +1146,10 @@ const SelectedCandidatesMaster = () => {
     return <Component key={refreshTriggers[tabName]} {...componentProps} />;
   };
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage) {
     return <AccessDenied />;
   }
@@ -1205,33 +1180,6 @@ const SelectedCandidatesMaster = () => {
           Manage {currentTabLabel.toLowerCase()} for selected candidates
         </Typography>
       </Box>
-
-      {/* Action Bar with Refresh - Commented out as per original */}
-      {/* <Paper sx={{ 
-        p: 1.5, 
-        mb: 2.5, 
-        borderRadius: 2,
-        bgcolor: COLORS.background.white,
-        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-        border: `1px solid ${COLORS.border}`
-      }}>
-        <Stack direction="row" justifyContent="flex-end" alignItems="center">
-          <Tooltip title="Refresh Current Tab">
-            <IconButton
-              onClick={handleRefresh}
-              sx={{
-                color: COLORS.text.secondary,
-                '&:hover': {
-                  bgcolor: `${COLORS.primary}20`,
-                  color: COLORS.primary
-                }
-              }}
-            >
-              <RefreshIcon sx={{ fontSize: '1rem' }} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Paper> */}
 
       {/* Tabs */}
       <Paper sx={{ 
@@ -1264,7 +1212,7 @@ const SelectedCandidatesMaster = () => {
             }
           }}
         >
-          {TABS.map((tab, index) => (
+          {TABS.map((tab) => (
             <Tab
               key={tab.value}
               icon={tab.icon}
