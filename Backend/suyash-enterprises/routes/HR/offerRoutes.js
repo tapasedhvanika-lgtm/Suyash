@@ -9,11 +9,12 @@ const {
   sendOfferLetter,
   viewOffer,
   acceptOffer,
-  viewOfferHTML  ,
+  viewOfferHTML,
   getCandidateApprovedOffers,
-  getOffers
-
+  getOffers,
+  bulkDeleteOffers // ✅ Added this
 } = require('../../controllers/HR/offerController');
+
 const { protect } = require('../../middleware/authMiddleware');
 const { validate } = require('../../middleware/validationMiddleware');
 const { body } = require('express-validator');
@@ -48,11 +49,12 @@ router.post('/:id/accept', acceptOffer);
 // Protected routes
 router.use(protect);
 
-router.get('/', 
-  getOffers
-);
+router.get('/', getOffers);
 
-router.post('/initiate',  validate(initiateOfferValidation), initiateOffer);
+// ✅ Bulk delete route MUST be placed before any /:id routes
+router.delete('/bulk', bulkDeleteOffers);
+
+router.post('/initiate', validate(initiateOfferValidation), initiateOffer);
 router.post('/:id/submit-approval', submitForApproval);
 router.post('/:id/approve', validate(approveValidation), approveOffer);
 router.post('/:id/reject', validate(rejectValidation), rejectOffer);

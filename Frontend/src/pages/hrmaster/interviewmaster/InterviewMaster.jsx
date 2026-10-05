@@ -3189,14 +3189,12 @@ import BASE_URL from "../../../config/Config";
 import { format, parseISO } from "date-fns";
 import { hasPermission, ACTIONS, MODULES, PAGES } from '../../../utils/modulePermissions';
 
-// Import interview components
 import ScheduleInterview from "./ScheduleInterview";
 import RescheduleInterview from "./RescheduleInterview";
 import InterviewFeedback from "./InterviewFeedback";
 import CancelInterview from "./CancelInterview";
 import ViewInterviewDetails from "./ViewInterviewDetails";
 
-// Color constants - Matching VendorMaster
 const COLORS = {
   primary: "#063C3F",
   primaryLight: "#E8F0F1",
@@ -3224,7 +3222,6 @@ const COLORS = {
   },
 };
 
-// Status color mapping
 const STATUS_COLORS = {
   scheduled: {
     bg: COLORS.chips.scheduled,
@@ -3258,7 +3255,6 @@ const STATUS_COLORS = {
   },
 };
 
-// Interview type config
 const TYPE_CONFIG = {
   video: {
     icon: <VideoCallIcon sx={{ fontSize: 12 }} />,
@@ -3277,7 +3273,6 @@ const TYPE_CONFIG = {
   },
 };
 
-// Interview rounds
 const INTERVIEW_ROUNDS = [
   "Telephonic",
   "Technical",
@@ -3286,21 +3281,18 @@ const INTERVIEW_ROUNDS = [
   "Final",
 ];
 
-// Interview types
 const INTERVIEW_TYPES = [
   { value: "video", label: "Video Call" },
   { value: "phone", label: "Phone Call" },
   { value: "in-person", label: "In Person" },
 ];
 
-// Loading state component
 const LoadingState = () => (
   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
     <CircularProgress size={40} sx={{ color: COLORS.primary }} />
   </Box>
 );
 
-// Access Denied component
 const AccessDenied = () => (
   <Box sx={{ p: 4, textAlign: 'center' }}>
     <Typography variant="h6" color="error" sx={{ mb: 2, fontSize: '1rem' }}>
@@ -3312,7 +3304,6 @@ const AccessDenied = () => (
   </Box>
 );
 
-// Filter Bar Component
 const FilterBar = ({
   filters,
   onFilterChange,
@@ -3550,7 +3541,6 @@ const FilterBar = ({
   );
 };
 
-// Action Menu Component with permission checks
 const ActionMenu = ({
   interview,
   onView,
@@ -3563,7 +3553,6 @@ const ActionMenu = ({
   userPermissions,
   isSuperAdmin,
 }) => {
-  // Check permissions
   const canView = isSuperAdmin || hasPermission(userPermissions, MODULES.INTERVIEW_MASTER, PAGES.INTERVIEW_SCHEDULING, ACTIONS.VIEW);
   const canUpdate = isSuperAdmin || hasPermission(userPermissions, MODULES.INTERVIEW_MASTER, PAGES.INTERVIEW_SCHEDULING, ACTIONS.UPDATE);
   const canDelete = isSuperAdmin || hasPermission(userPermissions, MODULES.INTERVIEW_MASTER, PAGES.INTERVIEW_SCHEDULING, ACTIONS.DELETE);
@@ -3730,29 +3719,23 @@ const ActionMenu = ({
 };
 
 const InterviewMaster = () => {
-  // State for data
   const [interviews, setInterviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchInput, setSearchInput] = useState("");
   
-  // ✅ ADDED: Missing state declarations
   const [error, setError] = useState("");
   const [totalPages, setTotalPages] = useState(1);
 
-  // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Selection state
   const [selected, setSelected] = useState([]);
 
-  // Sorting state
   const [orderBy, setOrderBy] = useState("scheduledAt");
   const [order, setOrder] = useState("desc");
 
-  // Filter state
   const [filters, setFilters] = useState({
     status: "",
     type: "",
@@ -3761,33 +3744,30 @@ const InterviewMaster = () => {
     dateTo: "",
   });
 
-  // Menu state
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedInterviewForAction, setSelectedInterviewForAction] = useState(null);
 
-  // Modal state
   const [openScheduleModal, setOpenScheduleModal] = useState(false);
   const [openRescheduleModal, setOpenRescheduleModal] = useState(false);
   const [openFeedbackModal, setOpenFeedbackModal] = useState(false);
   const [openCancelModal, setOpenCancelModal] = useState(false);
   const [openViewModal, setOpenViewModal] = useState(false);
 
-  // Selected interview
   const [selectedInterview, setSelectedInterview] = useState(null);
 
-  // Notification state
+  // ✅ NEW: Bulk delete loading state
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
-  // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
-  // Fetch user permissions from /api/auth/me
   useEffect(() => {
     const fetchUserPermissions = async () => {
       try {
@@ -3827,7 +3807,6 @@ const InterviewMaster = () => {
     fetchUserPermissions();
   }, []);
 
-  // Check permission helper
   const checkPermission = (action) => {
     if (isSuperAdmin) return true;
     return hasPermission(
@@ -3838,14 +3817,12 @@ const InterviewMaster = () => {
     );
   };
 
-  // Permission checks
   const canViewPage = checkPermission(ACTIONS.VIEW);
   const canCreate = checkPermission(ACTIONS.CREATE);
   const canUpdate = checkPermission(ACTIONS.UPDATE);
   const canDelete = checkPermission(ACTIONS.DELETE);
   const canApprove = checkPermission(ACTIONS.APPROVE);
 
-  // ✅ FIXED: Wrap fetchInterviews in useCallback
   const fetchInterviews = useCallback(async () => {
     if (!canViewPage && !isSuperAdmin) return;
     
@@ -3894,7 +3871,6 @@ const InterviewMaster = () => {
     }
   }, [page, rowsPerPage, orderBy, order, searchTerm, filters, canViewPage, isSuperAdmin]);
 
-  // ✅ FIXED: Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchTerm(searchInput);
@@ -3903,14 +3879,12 @@ const InterviewMaster = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // ✅ FIXED: Fetch interviews when dependencies change
   useEffect(() => {
     if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
       fetchInterviews();
     }
   }, [fetchInterviews, permissionsLoaded, canViewPage, isSuperAdmin]);
 
-  // Handle sort
   const handleRequestSort = (property) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
@@ -3918,7 +3892,6 @@ const InterviewMaster = () => {
     setPage(0);
   };
 
-  // Handle filter change
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -3933,7 +3906,6 @@ const InterviewMaster = () => {
     setPage(0);
   };
 
-  // Handle selection
   const handleSelectAll = (event) => {
     if (!canDelete && !isSuperAdmin) {
       showNotification("You don't have permission to delete interviews", "error");
@@ -3963,7 +3935,6 @@ const InterviewMaster = () => {
     setSelected(newSelected);
   };
 
-  // Handle pagination
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
     setSelected([]);
@@ -3975,7 +3946,6 @@ const InterviewMaster = () => {
     setSelected([]);
   };
 
-  // Handle CRUD actions
   const handleView = (interview) => {
     if (!canViewPage && !isSuperAdmin) {
       showNotification("You don't have permission to view interview details", "error");
@@ -4012,7 +3982,6 @@ const InterviewMaster = () => {
     setOpenCancelModal(true);
   };
 
-  // Action menu handlers
   const handleActionMenuOpen = (event, interview) => {
     setActionMenuAnchor(event.currentTarget);
     setSelectedInterviewForAction(interview);
@@ -4023,7 +3992,6 @@ const InterviewMaster = () => {
     setSelectedInterviewForAction(null);
   };
 
-  // Success handlers
   const handleScheduleSuccess = () => {
     setOpenScheduleModal(false);
     showNotification("Interview scheduled successfully!", "success");
@@ -4051,19 +4019,63 @@ const InterviewMaster = () => {
     fetchInterviews();
   };
 
-  const handleBulkDelete = () => {
+  // ✅ UPDATED: Handle bulk delete — now calls the actual API
+  const handleBulkDelete = async () => {
     if (!canDelete && !isSuperAdmin) {
       showNotification("You don't have permission to delete interviews", "error");
       return;
     }
-    showNotification("Bulk delete requires API implementation", "warning");
+    if (selected.length === 0) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selected.length} interview(s)? This action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setBulkDeleteLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await axios.delete(`${BASE_URL}/api/interviews/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { ids: selected } // DELETE with body
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} interview(s) deleted successfully`,
+          'success'
+        );
+
+        // Remove deleted rows from local state immediately for snappy UI
+        const selectedIds = [...selected];
+        setInterviews(prev => prev.filter(i => !selectedIds.includes(i._id)));
+        setSelected([]);
+
+        // Then refresh from server to stay in sync
+        fetchInterviews();
+      } else {
+        showNotification(response.data.message || 'Failed to delete interviews', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Server error during bulk delete',
+        'error'
+      );
+    } finally {
+      setBulkDeleteLoading(false);
+    }
   };
 
   const showNotification = (message, severity) => {
     setSnackbar({ open: true, message, severity });
   };
 
-  // Helper functions
   const formatDateTime = (dateTimeString) => {
     if (!dateTimeString) return "N/A";
     return format(parseISO(dateTimeString), "dd MMM yyyy, hh:mm a");
@@ -4122,19 +4134,16 @@ const InterviewMaster = () => {
     );
   };
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage && !isSuperAdmin) {
     return <AccessDenied />;
   }
 
   return (
     <Box sx={{ p: 2.5 }}>
-      {/* Page Header */}
       <Box sx={{ mb: 2.5 }}>
         <Typography
           variant="h5"
@@ -4156,7 +4165,6 @@ const InterviewMaster = () => {
         </Typography>
       </Box>
 
-      {/* Action Bar */}
       <Paper
         sx={{
           p: 1.5,
@@ -4173,7 +4181,6 @@ const InterviewMaster = () => {
           alignItems="center"
           justifyContent="space-between"
         >
-          {/* Search and Filters */}
           <Stack
             direction="row"
             spacing={1.5}
@@ -4227,14 +4234,17 @@ const InterviewMaster = () => {
             />
           </Stack>
 
-          {/* Action Buttons */}
           <Stack direction="row" spacing={1.5} alignItems="center">
-            {/* Bulk Delete Button */}
+            {/* ✅ Bulk Delete Button - now wired to API */}
             {(canDelete || isSuperAdmin) && selected.length > 0 && (
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={<DeleteIcon sx={{ fontSize: "1rem" }} />}
+                startIcon={
+                  bulkDeleteLoading 
+                    ? <CircularProgress size={16} color="inherit" />
+                    : <DeleteIcon sx={{ fontSize: "1rem" }} />
+                }
                 onClick={handleBulkDelete}
                 sx={{
                   height: 36,
@@ -4246,13 +4256,12 @@ const InterviewMaster = () => {
                   color: "#991b1b",
                   "&:hover": { borderColor: "#fecaca", bgcolor: "#fee2e2" },
                 }}
-                disabled={loading}
+                disabled={loading || bulkDeleteLoading}
               >
-                Delete ({selected.length})
+                {bulkDeleteLoading ? 'Deleting...' : `Delete (${selected.length})`}
               </Button>
             )}
 
-            {/* Schedule Interview Button */}
             {(canCreate || isSuperAdmin) && (
               <Button
                 variant="contained"
@@ -4277,7 +4286,6 @@ const InterviewMaster = () => {
         </Stack>
       </Paper>
 
-      {/* Interviews Table */}
       <Paper
         sx={{
           width: "100%",
@@ -4300,7 +4308,6 @@ const InterviewMaster = () => {
                   },
                 }}
               >
-                {/* Checkbox Column */}
                 {(canDelete || isSuperAdmin) && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
@@ -4324,86 +4331,28 @@ const InterviewMaster = () => {
                     />
                   </TableCell>
                 )}
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    color: COLORS.text.light,
-                  }}
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", color: COLORS.text.light }}>
                   Interview ID
                 </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    color: COLORS.text.light,
-                  }}
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", color: COLORS.text.light }}>
                   Candidate
                 </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    color: COLORS.text.light,
-                  }}
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", color: COLORS.text.light }}>
                   Position
                 </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    color: COLORS.text.light,
-                  }}
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", color: COLORS.text.light }}>
                   Round
                 </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    color: COLORS.text.light,
-                  }}
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", color: COLORS.text.light }}>
                   Type
                 </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    color: COLORS.text.light,
-                  }}
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", color: COLORS.text.light }}>
                   Scheduled Time
                 </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    color: COLORS.text.light,
-                  }}
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", color: COLORS.text.light }}>
                   Status
                 </TableCell>
-                <TableCell
-                  sx={{
-                    fontWeight: 600,
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.5px",
-                    width: 60,
-                    color: COLORS.text.light,
-                  }}
-                  align="center"
-                >
+                <TableCell sx={{ fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", width: 60, color: COLORS.text.light }} align="center">
                   Actions
                 </TableCell>
               </TableRow>
@@ -4468,7 +4417,6 @@ const InterviewMaster = () => {
                         },
                       }}
                     >
-                      {/* Checkbox Column */}
                       {(canDelete || isSuperAdmin) && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox
@@ -4589,7 +4537,6 @@ const InterviewMaster = () => {
           </Table>
         </TableContainer>
 
-        {/* Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
@@ -4611,7 +4558,6 @@ const InterviewMaster = () => {
         />
       </Paper>
 
-      {/* Modal Components */}
       {(canCreate || isSuperAdmin) && (
         <ScheduleInterview
           open={openScheduleModal}
@@ -4671,7 +4617,6 @@ const InterviewMaster = () => {
         </>
       )}
 
-      {/* Snackbar Notification */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}

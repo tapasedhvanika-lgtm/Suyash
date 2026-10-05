@@ -316,6 +316,9 @@ const JobOpeningMaster = () => {
     severity: 'success'
   });
 
+  // ✅ NEW: Bulk delete loading state
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
   // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -336,7 +339,6 @@ const JobOpeningMaster = () => {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
           
-          // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {
             setUserPermissions(userData.permissions);
           } else {
@@ -356,7 +358,6 @@ const JobOpeningMaster = () => {
 
   // Check permission helper
   const checkPermission = (action) => {
-    // Super admin has all permissions
     if (isSuperAdmin) return true;
     
     return hasPermission(
@@ -384,51 +385,48 @@ const JobOpeningMaster = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  const fetchJobs = useCallback(async (showLoader = true) => {
+    if (!canViewPage && !isSuperAdmin) return;
 
+    try {
+      if (showLoader) setLoading(true);
 
- const fetchJobs = useCallback(async (showLoader = true) => {
-  if (!canViewPage && !isSuperAdmin) return;
+      const token = localStorage.getItem('token');
 
-  try {
-    if (showLoader) setLoading(true);
+      const params = new URLSearchParams();
+      params.append('page', page + 1);
+      params.append('limit', rowsPerPage);
 
-    const token = localStorage.getItem('token');
+      if (searchTerm) params.append('search', searchTerm);
 
-    const params = new URLSearchParams();
-    params.append('page', page + 1);
-    params.append('limit', rowsPerPage);
+      const response = await axios.get(
+        `${BASE_URL}/api/jobs?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
 
-    if (searchTerm) params.append('search', searchTerm);
-
-    const response = await axios.get(
-      `${BASE_URL}/api/jobs?${params.toString()}`,
-      {
-        headers: { Authorization: `Bearer ${token}` }
+      if (response.data.success) {
+        const data = response.data.data || [];
+        setJobs(data);
+        setFilteredJobs(data);
+      } else {
+        showNotification('Failed to load job openings', 'error');
       }
-    );
 
-    if (response.data.success) {
-      const data = response.data.data || [];
-
-      setJobs(data);
-      setFilteredJobs(data); // ✅ server-side data
-    } else {
-      showNotification('Failed to load job openings', 'error');
+    } catch (err) {
+      console.error('Error fetching jobs:', err);
+      showNotification('Failed to load job openings. Please try again.', 'error');
+    } finally {
+      if (showLoader) setLoading(false);
     }
-
-  } catch (err) {
-    console.error('Error fetching jobs:', err);
-    showNotification('Failed to load job openings. Please try again.', 'error');
-  } finally {
-    if (showLoader) setLoading(false);
-  }
-}, [page, rowsPerPage, searchTerm, canViewPage, isSuperAdmin]);
+  }, [page, rowsPerPage, searchTerm, canViewPage, isSuperAdmin]);
 
   useEffect(() => {
-  if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
-    fetchJobs();
-  }
-}, [permissionsLoaded, canViewPage, isSuperAdmin, page, rowsPerPage, searchTerm]);
+    if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
+      fetchJobs();
+    }
+  }, [permissionsLoaded, canViewPage, isSuperAdmin, page, rowsPerPage, searchTerm]);
 
   const handleClearSearch = () => {
     setSearchInput('');
@@ -498,12 +496,58 @@ const JobOpeningMaster = () => {
     showNotification('Data refreshed', 'success');
   };
 
-  const handleBulkDelete = () => {
+  // ✅ UPDATED: Handle bulk delete — now calls the actual API
+  const handleBulkDelete = async () => {
     if (!canDelete && !isSuperAdmin) {
       showNotification('You do not have permission to delete job openings', 'error');
       return;
     }
-    showNotification('Bulk delete requires API implementation', 'warning');
+    if (selected.length === 0) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selected.length} job opening(s)? This action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setBulkDeleteLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await axios.delete(`${BASE_URL}/api/jobs/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { ids: selected } // DELETE with body
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} job opening(s) deleted successfully`,
+          'success'
+        );
+
+        // Remove deleted rows from local state immediately for snappy UI
+        const selectedIds = [...selected];
+        setJobs(prev => prev.filter(j => !selectedIds.includes(j._id)));
+        setFilteredJobs(prev => prev.filter(j => !selectedIds.includes(j._id)));
+        setSelected([]);
+
+        // Then refresh from server to stay in sync
+        fetchJobs(false);
+      } else {
+        showNotification(response.data.message || 'Failed to delete job openings', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Server error during bulk delete',
+        'error'
+      );
+    } finally {
+      setBulkDeleteLoading(false);
+    }
   };
 
   const handleActionMenuOpen = (event, job) => {
@@ -602,12 +646,10 @@ const JobOpeningMaster = () => {
   const paginatedJobs = filteredJobs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const isFilterActive = searchTerm;
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage && !isSuperAdmin) {
     return <AccessDenied />;
   }
@@ -703,12 +745,16 @@ const JobOpeningMaster = () => {
           </Stack>
 
           <Stack direction="row" spacing={1.5}>
-            {/* Bulk Delete Button - Only show if user has delete permission */}
+            {/* ✅ Bulk Delete Button - now wired to API */}
             {(canDelete || isSuperAdmin) && selected.length > 0 && (
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                startIcon={
+                  bulkDeleteLoading 
+                    ? <CircularProgress size={16} color="inherit" />
+                    : <DeleteIcon sx={{ fontSize: '1rem' }} />
+                }
                 onClick={handleBulkDelete}
                 sx={{ 
                   height: 36,
@@ -720,9 +766,9 @@ const JobOpeningMaster = () => {
                   color: '#991b1b',
                   '&:hover': { borderColor: '#fecaca', bgcolor: '#fee2e2' }
                 }}
-                disabled={loading}
+                disabled={loading || bulkDeleteLoading}
               >
-                Delete ({selected.length})
+                {bulkDeleteLoading ? 'Deleting...' : `Delete (${selected.length})`}
               </Button>
             )}
 
@@ -770,7 +816,6 @@ const JobOpeningMaster = () => {
                   py: 1.5
                 }
               }}>
-                {/* Checkbox Column - Only show if user has delete permission */}
                 {(canDelete || isSuperAdmin) && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
@@ -861,7 +906,6 @@ const JobOpeningMaster = () => {
                         }
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has delete permission */}
                       {(canDelete || isSuperAdmin) && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox

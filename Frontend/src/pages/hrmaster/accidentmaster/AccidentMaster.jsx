@@ -1345,7 +1345,6 @@ import {
   Refresh as RefreshIcon,
   Warning as WarningIcon,
   ArrowUpward as ArrowUpwardIcon,
-  // Status as StatusIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import BASE_URL from '../../../config/Config';
@@ -1359,7 +1358,6 @@ import DeleteAccident from './DeleteAccident';
 import EditAccident from './EditAccident';
 
 // Color constants
-// Color constants - Single color #063C3F throughout (matching DepartmentMaster)
 const COLORS = {
   primary: '#063C3F',
   primaryLight: '#E8F0F1',
@@ -1392,6 +1390,7 @@ const COLORS = {
     closed: { bg: '#dcfce7', color: '#166534', border: '#86efac' }
   }
 };
+
 // Loading state component
 const LoadingState = () => (
   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -1434,19 +1433,19 @@ const ActionMenu = ({ accident, onView, onInvestigate, onEdit, onDelete, anchorE
           </MenuItem>
         )}
 
-       {canUpdate && (
-  <MenuItem onClick={() => { onEdit(accident); onClose(); }}>
-    <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
-    <ListItemText>Edit</ListItemText>
-  </MenuItem>
-)}
+        {canUpdate && (
+          <MenuItem onClick={() => { onEdit(accident); onClose(); }}>
+            <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Edit</ListItemText>
+          </MenuItem>
+        )}
 
-{canUpdate && (
-  <MenuItem onClick={() => { onInvestigate(accident); onClose(); }}>
-    <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
-    <ListItemText>Investigate</ListItemText>
-  </MenuItem>
-)}
+        {canUpdate && (
+          <MenuItem onClick={() => { onInvestigate(accident); onClose(); }}>
+            <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Investigate</ListItemText>
+          </MenuItem>
+        )}
 
         {canDelete && (
           <MenuItem onClick={() => { onDelete(accident); onClose(); }}>
@@ -1461,45 +1460,40 @@ const ActionMenu = ({ accident, onView, onInvestigate, onEdit, onDelete, anchorE
 
 
 const AccidentMaster = () => {
-  // State for data
   const [accidents, setAccidents] = useState([]);
   const [filteredAccidents, setFilteredAccidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
 
-  // Table state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selected, setSelected] = useState([]);
 
-  // Menu state for action buttons
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedAccidentForAction, setSelectedAccidentForAction] = useState(null);
 
-  // Modal state
   const [openAddModal, setOpenAddModal] = useState(false);
   const [openInvestigateModal, setOpenInvestigateModal] = useState(false);
   const [openViewModal, setOpenViewModal] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openEditModal, setOpenEditModal] = useState(false);
 
-  // Selected accident
   const [selectedAccident, setSelectedAccident] = useState(null);
 
-  // Notification state
+  // ✅ CHANGE 1: New bulk delete loading state
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
 
-  // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
-  // Fetch user permissions
   useEffect(() => {
     const fetchUserPermissions = async () => {
       try {
@@ -1514,7 +1508,6 @@ const AccidentMaster = () => {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
 
-          // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {
             setUserPermissions(userData.permissions);
           } else {
@@ -1532,9 +1525,7 @@ const AccidentMaster = () => {
     fetchUserPermissions();
   }, []);
 
-  // Check permission helper
   const checkPermission = (action) => {
-    // Super admin has all permissions
     if (isSuperAdmin) return true;
 
     return hasPermission(
@@ -1545,7 +1536,6 @@ const AccidentMaster = () => {
     );
   };
 
-  // Permission checks
   const canViewPage = checkPermission(ACTIONS.VIEW);
   const canCreate = checkPermission(ACTIONS.CREATE);
   const canUpdate = checkPermission(ACTIONS.UPDATE);
@@ -1553,7 +1543,6 @@ const AccidentMaster = () => {
   const canExport = checkPermission(ACTIONS.EXPORT);
   const canPrint = checkPermission(ACTIONS.PRINT);
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchTerm(searchInput);
@@ -1563,7 +1552,6 @@ const AccidentMaster = () => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Fetch accidents from API - only if user has permission
   useEffect(() => {
     if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
       fetchAccidents();
@@ -1571,50 +1559,48 @@ const AccidentMaster = () => {
   }, [permissionsLoaded, canViewPage, isSuperAdmin]);
 
   const fetchAccidents = async (showLoader = true) => {
-  try {
-    if (showLoader) setLoading(true);
+    try {
+      if (showLoader) setLoading(true);
 
-    const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token');
 
-    const params = new URLSearchParams();
-    params.append('page', page + 1);
-    params.append('limit', rowsPerPage);
+      const params = new URLSearchParams();
+      params.append('page', page + 1);
+      params.append('limit', rowsPerPage);
 
-    if (searchTerm) params.append('search', searchTerm);
+      if (searchTerm) params.append('search', searchTerm);
 
-    const response = await axios.get(
-      `${BASE_URL}/api/safety/accidents?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await axios.get(
+        `${BASE_URL}/api/safety/accidents?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
+      );
+
+      if (response.data.success) {
+        const data = response.data.data || [];
+
+        setAccidents(data);
+        setFilteredAccidents(data);
+      } else {
+        showNotification('Failed to load accidents', 'error');
       }
-    );
 
-    if (response.data.success) {
-      const data = response.data.data || [];
-
-      setAccidents(data);
-      setFilteredAccidents(data); // ✅ server-side
-    } else {
-      showNotification('Failed to load accidents', 'error');
+    } catch (err) {
+      console.error('Error fetching accidents:', err);
+      showNotification('Failed to load accidents. Please try again.', 'error');
+    } finally {
+      if (showLoader) setLoading(false);
     }
+  };
 
-  } catch (err) {
-    console.error('Error fetching accidents:', err);
-    showNotification('Failed to load accidents. Please try again.', 'error');
-  } finally {
-    if (showLoader) setLoading(false);
-  }
-};
-
-  // Handle refresh
   const handleRefresh = () => {
     fetchAccidents();
     showNotification('Data refreshed', 'success');
   };
 
-  // Handle search (client-side filtering)
   const handleSearch = () => {
     if (!searchTerm) {
       setFilteredAccidents(accidents);
@@ -1634,12 +1620,10 @@ const AccidentMaster = () => {
     setFilteredAccidents(filtered);
   };
 
-  // Apply search when searchTerm changes
   useEffect(() => {
     handleSearch();
   }, [searchTerm, accidents]);
 
-  // Handle select all - only if user has delete permission
   const handleSelectAll = (event) => {
     if (!canDelete) return;
 
@@ -1650,7 +1634,6 @@ const AccidentMaster = () => {
     }
   };
 
-  // Handle single selection - only if user has delete permission
   const handleSelect = (id) => {
     if (!canDelete) return;
 
@@ -1666,63 +1649,32 @@ const AccidentMaster = () => {
     setSelected(newSelected);
   };
 
-  // Handle page change
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
     setSelected([]);
   };
 
-  // Handle rows per page change
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
     setSelected([]);
   };
 
-  // Handle add accident
   const handleAddAccident = (newAccident) => {
     setAccidents(prev => [newAccident, ...prev]);
     showNotification('Accident reported successfully!', 'success');
   };
 
-  // Handle Investigate accident
- /* const handleInvestigateAccident = (updatedAccident) => {
-    console.log('Received updated accident:', updatedAccident);
-    console.log('New status:', updatedAccident.investigationStatus);
-    const updatedAccidents = accidents.map(accident =>
-      accident._id === updatedAccident._id ? updatedAccident : accident
-    );
-
-    setAccidents(updatedAccidents);
-    setFilteredAccidents(updatedAccidents);
-    showNotification('Investigation updated successfully!', 'success');
-  };
-
-  const handleEditAccident = (updatedAccident) => {
-    console.log('Received updated accident:', updatedAccident);
-    const updatedAccidents = accidents.map(accident =>
-      accident._id === updatedAccident._id ? updatedAccident : accident
-    );
-    setAccidents(updatedAccidents);
-    setFilteredAccidents(updatedAccidents);
-    showNotification('Accident updated successfully!', 'success');
-  };
-  */
-
-
-     // Handle Investigate accident
-  const handleInvestigateAccident = () => { // 👈 REMOVED THE PARAMETER
+  const handleInvestigateAccident = () => {
     showNotification('Investigation updated successfully!', 'success');
     fetchAccidents(false); 
   };
 
-  // Handle Edit accident
-  const handleEditAccident = () => { // 👈 REMOVED THE PARAMETER
+  const handleEditAccident = () => {
     showNotification('Accident updated successfully!', 'success');
     fetchAccidents(false); 
   };
 
-  // Handle delete accident
   const handleDeleteAccident = (accidentId) => {
     const updatedAccidents = accidents.filter(accident => accident._id !== accidentId);
     setAccidents(updatedAccidents);
@@ -1730,13 +1682,58 @@ const AccidentMaster = () => {
     showNotification('Accident record deleted successfully!', 'success');
   };
 
-  // Handle bulk delete
-  const handleBulkDelete = () => {
-    if (!canDelete) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
+  // ✅ CHANGE 2: Bulk delete now calls the actual API
+  const handleBulkDelete = async () => {
+    if (!canDelete) {
+      showNotification('You do not have permission to delete accidents', 'error');
+      return;
+    }
+    if (selected.length === 0) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selected.length} accident(s)? This action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setBulkDeleteLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await axios.delete(`${BASE_URL}/api/safety/accidents/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { ids: selected }
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} accident(s) deleted successfully`,
+          'success'
+        );
+
+        const selectedIds = [...selected];
+        setAccidents(prev => prev.filter(a => !selectedIds.includes(a._id)));
+        setFilteredAccidents(prev => prev.filter(a => !selectedIds.includes(a._id)));
+        setSelected([]);
+
+        fetchAccidents(false);
+      } else {
+        showNotification(response.data.message || 'Failed to delete accidents', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Server error during bulk delete',
+        'error'
+      );
+    } finally {
+      setBulkDeleteLoading(false);
+    }
   };
 
-  // Action menu handlers
   const handleActionMenuOpen = (event, accident) => {
     setActionMenuAnchor(event.currentTarget);
     setSelectedAccidentForAction(accident);
@@ -1747,7 +1744,6 @@ const AccidentMaster = () => {
     setSelectedAccidentForAction(null);
   };
 
-  // Open Investigate modal
   const openInvestigateAccidentModal = (accident) => {
     if (!canUpdate) return;
     setSelectedAccident(accident);
@@ -1762,7 +1758,6 @@ const AccidentMaster = () => {
     handleActionMenuClose();
   };
 
-  // Open view modal
   const openViewAccidentModal = (accident) => {
     if (!canViewPage) return;
     setSelectedAccident(accident);
@@ -1770,7 +1765,6 @@ const AccidentMaster = () => {
     handleActionMenuClose();
   };
 
-  // Open delete confirmation
   const openDeleteAccidentDialog = (accident) => {
     if (!canDelete) return;
     setSelectedAccident(accident);
@@ -1778,7 +1772,6 @@ const AccidentMaster = () => {
     handleActionMenuClose();
   };
 
-  // Show notification
   const showNotification = (message, severity) => {
     setSnackbar({
       open: true,
@@ -1787,7 +1780,6 @@ const AccidentMaster = () => {
     });
   };
 
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -1797,7 +1789,6 @@ const AccidentMaster = () => {
     });
   };
 
-  // Get severity chip styles
   const getSeverityChip = (severity) => {
     const s = severity?.toLowerCase();
     const styles = {
@@ -1841,17 +1832,11 @@ const AccidentMaster = () => {
     return status;
   };
 
-  //  const getStatusChip = (status) => {
-  //   if (!status) return null;
-
-  // const s = status.toLowerCase().trim();
-
   const getStatusChip = (status) => {
     if (!status) return null;
 
     const statusLower = status.toLowerCase();
 
-    // Map all possible status values to their display text
     const displayText = {
       'open': 'Open',
       'under investigation': 'Under Investigation',
@@ -1890,18 +1875,15 @@ const AccidentMaster = () => {
     );
   };
 
-  // Paginated accidents
   const paginatedAccidents = filteredAccidents.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage && !isSuperAdmin) {
     return <AccessDenied />;
   }
@@ -1927,42 +1909,6 @@ const AccidentMaster = () => {
         </Typography>
       </Box>
 
-      {/* Stats Cards */}
-      {/* <Stack direction="row" spacing={2} sx={{ mb: 2.5 }}>
-        <Paper sx={{ flex: 1, p: 1.5, borderRadius: 2, border: `1px solid ${COLORS.border}` }}>
-          <Typography variant="caption" sx={{ color: COLORS.text.secondary, display: 'block' }}>
-            Total Accidents
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: COLORS.text.primary }}>
-            {accidents.length}
-          </Typography>
-        </Paper>
-        <Paper sx={{ flex: 1, p: 1.5, borderRadius: 2, border: `1px solid ${COLORS.border}` }}>
-          <Typography variant="caption" sx={{ color: COLORS.text.secondary, display: 'block' }}>
-            Open Cases
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#991b1b' }}>
-            {accidents.filter(a => a.investigationStatus === 'Open').length}
-          </Typography>
-        </Paper>
-        <Paper sx={{ flex: 1, p: 1.5, borderRadius: 2, border: `1px solid ${COLORS.border}` }}>
-          <Typography variant="caption" sx={{ color: COLORS.text.secondary, display: 'block' }}>
-            Closed Cases
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#166534' }}>
-            {accidents.filter(a => a.investigationStatus === 'Closed').length}
-          </Typography>
-        </Paper>
-        <Paper sx={{ flex: 1, p: 1.5, borderRadius: 2, border: `1px solid ${COLORS.border}` }}>
-          <Typography variant="caption" sx={{ color: COLORS.text.secondary, display: 'block' }}>
-            Total Cost
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: COLORS.text.primary }}>
-            ₹ {accidents.reduce((sum, a) => sum + (a.costIncurred || 0), 0).toLocaleString()}
-          </Typography>
-        </Paper>
-      </Stack> */}
-
       {/* Action Bar */}
       <Paper sx={{
         p: 1.5,
@@ -1973,7 +1919,6 @@ const AccidentMaster = () => {
         border: `1px solid ${COLORS.border}`
       }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center" justifyContent="space-between">
-          {/* Search */}
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1 }}>
             <TextField
               placeholder="Search by location, machine, severity, employee..."
@@ -2014,14 +1959,17 @@ const AccidentMaster = () => {
             />
           </Stack>
 
-          {/* Action Buttons - Conditionally rendered based on permissions */}
           <Stack direction="row" spacing={1.5} alignItems="center">
-            {/* Bulk Delete Button - Only show if user has delete permission */}
+            {/* ✅ CHANGE 3: Delete button shows spinner while loading */}
             {canDelete && selected.length > 0 && (
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                startIcon={
+                  bulkDeleteLoading 
+                    ? <CircularProgress size={16} color="inherit" />
+                    : <DeleteIcon sx={{ fontSize: '1rem' }} />
+                }
                 onClick={handleBulkDelete}
                 sx={{
                   height: 36,
@@ -2036,13 +1984,12 @@ const AccidentMaster = () => {
                     bgcolor: '#fee2e2'
                   }
                 }}
-                disabled={loading}
+                disabled={loading || bulkDeleteLoading}
               >
-                Delete ({selected.length})
+                {bulkDeleteLoading ? 'Deleting...' : `Delete (${selected.length})`}
               </Button>
             )}
 
-            {/* Add Accident Button - Only show if user has create permission */}
             {canCreate && (
               <Button
                 variant="contained"
@@ -2088,7 +2035,6 @@ const AccidentMaster = () => {
                   py: 1.5
                 }
               }}>
-                {/* Checkbox Column - Only show if user has delete permission */}
                 {canDelete && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
@@ -2111,64 +2057,28 @@ const AccidentMaster = () => {
                     />
                   </TableCell>
                 )}
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   <Stack direction="row" alignItems="center" spacing={0.5}>
                     <span>Date</span>
                     <ArrowUpwardIcon sx={{ fontSize: 12, opacity: 0.9 }} />
                   </Stack>
                 </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   Location
                 </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   Machine
                 </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   Severity
                 </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   Status
                 </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   Reported By
                 </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  width: 60,
-                  color: COLORS.text.light
-                }} align="center">
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', width: 60, color: COLORS.text.light }} align="center">
                   Actions
                 </TableCell>
               </TableRow>
@@ -2226,7 +2136,6 @@ const AccidentMaster = () => {
                         }
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has delete permission */}
                       {canDelete && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox
@@ -2263,8 +2172,8 @@ const AccidentMaster = () => {
                         {getSeverityChip(accident.severity)}
                       </TableCell>
                       <TableCell>
-  {getStatusChip(accident.investigationStatus || accident.status)}
-</TableCell>
+                        {getStatusChip(accident.investigationStatus || accident.status)}
+                      </TableCell>
                       <TableCell>
                         <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.primary }}>
                           {accident.employee?.FirstName || accident.reportedBy?.name || 'N/A'}
@@ -2291,7 +2200,6 @@ const AccidentMaster = () => {
           </Table>
         </TableContainer>
 
-        {/* Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
@@ -2316,7 +2224,7 @@ const AccidentMaster = () => {
         />
       </Paper>
 
-      {/* Modal Components - Only render if user has appropriate permissions */}
+      {/* Modal Components */}
       {canCreate && (
         <AddAccident
           open={openAddModal}
@@ -2368,7 +2276,7 @@ const AccidentMaster = () => {
             />
           )}
 
-          { canUpdate&& (
+          {canUpdate && (
             <EditAccident
               open={openEditModal}
               onClose={() => {
@@ -2382,7 +2290,6 @@ const AccidentMaster = () => {
         </>
       )}
 
-      {/* Snackbar Notification */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}

@@ -129,7 +129,7 @@ const applyLeave = async (req, res) => {
       NumberOfDays: leaveDays,
       Status: 'Pending',
       AppliedOn: new Date(),
-      AppliedBy: req.user?._id || null // Optional: still track who applied if user is authenticated
+      AppliedBy: req.user?._id || null
     });
     
     await leave.save();
@@ -167,7 +167,6 @@ const updateLeave = async (req, res) => {
       addressDuringLeave
     } = req.body;
 
-    // Find the leave request
     const leave = await Leave.findById(id)
       .populate('EmployeeID')
       .populate('LeaveTypeID');
@@ -179,7 +178,6 @@ const updateLeave = async (req, res) => {
       });
     }
 
-    // Check if leave is still pending
     if (leave.Status !== 'Pending') {
       return res.status(400).json({
         success: false,
@@ -187,14 +185,11 @@ const updateLeave = async (req, res) => {
       });
     }
 
-    // Store original values for comparison
     const originalStartDate = leave.StartDate;
     const originalEndDate = leave.EndDate;
     const originalLeaveTypeId = leave.LeaveTypeID._id;
 
-    // Update fields if provided
     if (leaveTypeId && leaveTypeId !== originalLeaveTypeId.toString()) {
-      // Check if new leave type exists and is active
       const leaveType = await LeaveType.findById(leaveTypeId);
       if (!leaveType || !leaveType.IsActive) {
         return res.status(400).json({
@@ -205,7 +200,6 @@ const updateLeave = async (req, res) => {
       leave.LeaveTypeID = leaveTypeId;
     }
 
-    // Convert and validate dates if provided
     if (startDate || endDate) {
       const newStartDate = startDate ? new Date(startDate) : leave.StartDate;
       const newEndDate = endDate ? new Date(endDate) : leave.EndDate;
@@ -213,7 +207,6 @@ const updateLeave = async (req, res) => {
       newStartDate.setHours(0, 0, 0, 0);
       newEndDate.setHours(23, 59, 59, 999);
 
-      // Validate dates
       if (newStartDate > newEndDate) {
         return res.status(400).json({
           success: false,
@@ -230,7 +223,6 @@ const updateLeave = async (req, res) => {
         });
       }
 
-      // Check for overlapping leaves (excluding current leave)
       const overlappingLeave = await Leave.findOne({
         EmployeeID: leave.EmployeeID._id,
         _id: { $ne: id },
@@ -250,10 +242,8 @@ const updateLeave = async (req, res) => {
       leave.StartDate = newStartDate;
       leave.EndDate = newEndDate;
       
-      // Recalculate number of days
       const newNumberOfDays = calculateLeaveDays(newStartDate, newEndDate);
       
-      // Check leave balance if dates changed
       if (newNumberOfDays !== leave.NumberOfDays) {
         const availableBalance = await checkLeaveBalance(
           leave.EmployeeID._id, 
@@ -272,15 +262,12 @@ const updateLeave = async (req, res) => {
       }
     }
 
-    // Update other fields if provided
     if (reason !== undefined) leave.Reason = reason;
     if (contactNumber !== undefined) leave.ContactNumber = contactNumber;
     if (addressDuringLeave !== undefined) leave.AddressDuringLeave = addressDuringLeave;
 
-    // Save the updated leave
     await leave.save();
 
-    // Populate the response
     await leave.populate('EmployeeID', 'EmployeeID FirstName LastName DesignationID DepartmentID');
     await leave.populate('LeaveTypeID', 'Name MaxDaysPerYear');
 
@@ -306,7 +293,6 @@ const deleteLeave = async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
 
-    // Find the leave request
     const leave = await Leave.findById(id);
 
     if (!leave) {
@@ -316,7 +302,6 @@ const deleteLeave = async (req, res) => {
       });
     }
 
-    // Check if leave is still pending
     if (leave.Status !== 'Pending') {
       return res.status(400).json({
         success: false,
@@ -324,22 +309,7 @@ const deleteLeave = async (req, res) => {
       });
     }
 
-    // Option 1: Permanently delete the leave
     await Leave.findByIdAndDelete(id);
-
-    // Option 2: Soft delete by updating status to 'Cancelled' (uncomment if preferred)
-    /*
-    leave.Status = 'Cancelled';
-    leave.CancelledOn = new Date();
-    leave.CancelRemarks = reason || 'Deleted by user';
-    await leave.save();
-    
-    return res.json({
-      success: true,
-      message: 'Leave request cancelled successfully',
-      data: leave
-    });
-    */
 
     return res.json({
       success: true,
@@ -380,7 +350,6 @@ const processLeave = async (req, res) => {
       });
     }
     
-    // Check if already processed
     if (leave.Status !== 'Pending') {
       return res.status(400).json({
         success: false,
@@ -388,12 +357,10 @@ const processLeave = async (req, res) => {
       });
     }
     
-    // Store employee and leave type IDs for later use
     const employeeId = leave.EmployeeID._id;
     const leaveTypeId = leave.LeaveTypeID._id;
     const numberOfDays = leave.NumberOfDays;
     
-    // Update leave status
     leave.Status = status;
     leave.ProcessedBy = approvedBy || req.user?._id;
     leave.ProcessedOn = new Date();
@@ -401,19 +368,15 @@ const processLeave = async (req, res) => {
     
     await leave.save();
     
-    // If approved, update attendance records and leave balance
     if (status === 'Approved') {
       await updateAttendanceForLeave(leave);
-      
-      // Update employee leave balance
       await updateLeaveBalance(employeeId, leaveTypeId, numberOfDays);
     }
     
-    // Re-fetch the leave with updated employee data
     const updatedLeave = await Leave.findById(id)
       .populate({
         path: 'EmployeeID',
-        select: '-password -refreshToken' // Exclude sensitive fields if any
+        select: '-password -refreshToken'
       })
       .populate('LeaveTypeID')
       .populate('ProcessedBy', 'FirstName LastName EmployeeID');
@@ -469,7 +432,6 @@ const getEmployeeLeaves = async (req, res) => {
     
     const total = await Leave.countDocuments(query);
     
-    // Calculate leave summary
     const summary = await Leave.aggregate([
       { $match: { EmployeeID: new mongoose.Types.ObjectId(employeeId) } },
       {
@@ -481,7 +443,6 @@ const getEmployeeLeaves = async (req, res) => {
       }
     ]);
     
-    // Get leave balance
     const leaveBalance = await getLeaveBalances(employeeId);
     
     return res.json({
@@ -520,7 +481,6 @@ const getPendingLeaves = async (req, res) => {
     
     let query = { Status: 'Pending' };
     
-    // If departmentId provided, get employees in that department
     if (departmentId) {
       const employees = await Employee.find({ DepartmentID: departmentId }).select('_id');
       query.EmployeeID = { $in: employees.map(e => e._id) };
@@ -582,7 +542,6 @@ const cancelLeave = async (req, res) => {
       });
     }
     
-    // Only pending leaves can be cancelled by employee
     if (leave.Status !== 'Pending') {
       return res.status(400).json({
         success: false,
@@ -590,7 +549,6 @@ const cancelLeave = async (req, res) => {
       });
     }
     
-    // Mark as cancelled
     leave.Status = 'Cancelled';
     leave.CancelledOn = new Date();
     leave.CancelRemarks = reason;
@@ -680,7 +638,6 @@ const getLeaveReport = async (req, res) => {
       .populate('ProcessedBy', 'FirstName LastName')
       .sort({ StartDate: 1 });
     
-    // Calculate summary
     const summary = await Leave.aggregate([
       { $match: query },
       {
@@ -731,7 +688,6 @@ const getLeaveReport = async (req, res) => {
     };
     
     if (format === 'csv') {
-      // Convert to CSV (simplified)
       const csv = convertToCSV(leaves);
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=leave_report_${startDate}_${endDate}.csv`);
@@ -756,7 +712,6 @@ const getLeaveReport = async (req, res) => {
 // Helper function to check leave balance
 const checkLeaveBalance = async (employeeId, leaveTypeId, requestedDays) => {
   try {
-    // Get total approved leaves for the year
     const startOfYear = new Date(new Date().getFullYear(), 0, 1);
     const endOfYear = new Date(new Date().getFullYear(), 11, 31);
     
@@ -770,7 +725,6 @@ const checkLeaveBalance = async (employeeId, leaveTypeId, requestedDays) => {
     
     const totalUsedDays = approvedLeaves.reduce((sum, leave) => sum + leave.NumberOfDays, 0);
     
-    // Get leave type maximum days
     const leaveType = await LeaveType.findById(leaveTypeId);
     const maxDays = leaveType?.MaxDaysPerYear || 0;
     
@@ -793,7 +747,6 @@ const updateAttendanceForLeave = async (leave) => {
     while (currentDate <= end) {
       const dayOfWeek = currentDate.getDay();
       
-      // Only update attendance for weekdays
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
         const dateStart = new Date(currentDate);
         dateStart.setHours(0, 0, 0, 0);
@@ -814,7 +767,6 @@ const updateAttendanceForLeave = async (leave) => {
           attendance.Remarks = `On ${leave.LeaveTypeID?.Name || 'Leave'}`;
           await attendance.save();
         } else {
-          // Create attendance record if not exists
           const newAttendance = new AttendanceProcessed({
             EmployeeID: EmployeeID,
             Date: currentDate,
@@ -840,7 +792,6 @@ const updateLeaveBalance = async (employeeId, leaveTypeId, usedDays) => {
   try {
     console.log(`Updating leave balance for employee ${employeeId}: Used ${usedDays} days of leave type ${leaveTypeId}`);
     
-    // Get the leave type to know max days
     const leaveType = await LeaveType.findById(leaveTypeId);
     if (!leaveType) {
       console.error('Leave type not found:', leaveTypeId);
@@ -852,7 +803,6 @@ const updateLeaveBalance = async (employeeId, leaveTypeId, usedDays) => {
     
     console.log(`Leave type: ${leaveType.Name}, Max days per year: ${maxDays}`);
     
-    // Get the current employee
     const employee = await Employee.findById(employeeId);
     if (!employee) {
       console.error('Employee not found:', employeeId);
@@ -861,21 +811,17 @@ const updateLeaveBalance = async (employeeId, leaveTypeId, usedDays) => {
     
     console.log('Current employee LeaveBalances:', employee.LeaveBalances);
     
-    // Initialize or update LeaveBalances
     if (!employee.LeaveBalances || Object.keys(employee.LeaveBalances).length === 0) {
-      // If no LeaveBalances exist, create with all leave types
       employee.LeaveBalances = {
-        casualLeave: 12,        // Default values - adjust as needed
-        sickLeave: 6,           // Should match leaveType.MaxDaysPerYear for Sick Leave
+        casualLeave: 12,
+        sickLeave: 6,
         earnedLeave: 15,
         maternityLeave: 180,
         paternityLeave: 15,
         compOff: 0,
-        // Add other leave types if needed
       };
       console.log('Created new LeaveBalances for employee');
     } else {
-      // Ensure all leave type fields exist
       const defaultBalances = {
         casualLeave: 12,
         sickLeave: 6,
@@ -885,12 +831,10 @@ const updateLeaveBalance = async (employeeId, leaveTypeId, usedDays) => {
         compOff: 0
       };
       
-      // Merge existing balances with defaults (preserve existing values)
       employee.LeaveBalances = { ...defaultBalances, ...employee.LeaveBalances };
       console.log('Ensured all leave balance fields exist');
     }
     
-    // Map leave type name to field name
     const leaveTypeMap = {
       'sickleave': 'sickLeave',
       'casualleave': 'casualLeave', 
@@ -909,15 +853,12 @@ const updateLeaveBalance = async (employeeId, leaveTypeId, usedDays) => {
     
     if (!leaveTypeKey) {
       console.error('Unknown leave type:', leaveTypeName);
-      // Create a new key based on leave type name
       const newKey = leaveTypeName.charAt(0).toLowerCase() + leaveTypeName.slice(1);
       employee.LeaveBalances[newKey] = maxDays;
       console.log(`Created new leave balance field: ${newKey} with ${maxDays} days`);
     } else {
-      // Check if this leave type balance needs initialization
       const currentBalance = employee.LeaveBalances[leaveTypeKey];
       
-      // If balance is 0 or undefined, initialize it with max days
       if (currentBalance === 0 || currentBalance === undefined || currentBalance === null) {
         console.log(`Initializing ${leaveTypeKey} with ${maxDays} days (was: ${currentBalance})`);
         employee.LeaveBalances[leaveTypeKey] = maxDays;
@@ -925,17 +866,13 @@ const updateLeaveBalance = async (employeeId, leaveTypeId, usedDays) => {
       
       console.log(`Before update - ${leaveTypeKey}: ${employee.LeaveBalances[leaveTypeKey]} days`);
       
-      // Update balance (subtract used days)
       const newBalance = Math.max(0, employee.LeaveBalances[leaveTypeKey] - usedDays);
       employee.LeaveBalances[leaveTypeKey] = newBalance;
       
       console.log(`After update - ${leaveTypeKey}: ${newBalance} days remaining`);
     }
     
-    // Mark LeaveBalances as modified
     employee.markModified('LeaveBalances');
-    
-    // Save the employee
     await employee.save();
     
     console.log('Updated employee LeaveBalances:', employee.LeaveBalances);
@@ -951,7 +888,6 @@ const updateLeaveBalance = async (employeeId, leaveTypeId, usedDays) => {
 // Helper function to get leave balances
 const getLeaveBalances = async (employeeId) => {
   try {
-    // Get all active leave types
     const leaveTypes = await LeaveType.find({ IsActive: true });
     
     const balances = [];
@@ -959,7 +895,6 @@ const getLeaveBalances = async (employeeId) => {
     const endOfYear = new Date(new Date().getFullYear(), 11, 31);
     
     for (const leaveType of leaveTypes) {
-      // Get used leaves for this type in current year
       const usedLeaves = await Leave.find({
         EmployeeID: employeeId,
         LeaveTypeID: leaveType._id,
@@ -1020,6 +955,57 @@ const convertToCSV = (data) => {
   return csvRows.join('\n');
 };
 
+// ✅ ENHANCED: Bulk delete leave applications
+// @desc    Bulk delete leave applications
+// @route   DELETE /api/leaves/bulk
+// @access  HR/Admin only
+const bulkDeleteLeaves = async (req, res) => {
+  try {
+    // Accept both 'leaveIds' and 'ids' for flexibility with frontend
+    const { leaveIds, ids } = req.body;
+    const incomingIds = leaveIds || ids;
+
+    if (!incomingIds || !Array.isArray(incomingIds) || incomingIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No leave applications selected for deletion'
+      });
+    }
+
+    // Filter to valid ObjectIds only
+    const validIds = incomingIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid leave application IDs provided'
+      });
+    }
+
+    const result = await Leave.deleteMany({ _id: { $in: validIds } });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No leave applications found with the given IDs'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} leave application(s) deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete leave error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+};
+
 // Export all functions
 module.exports = {
   applyLeave,
@@ -1036,5 +1022,6 @@ module.exports = {
   updateAttendanceForLeave,
   updateLeaveBalance,
   getLeaveBalances,
-  convertToCSV
+  convertToCSV,
+  bulkDeleteLeaves
 };

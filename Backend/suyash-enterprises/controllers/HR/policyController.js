@@ -385,3 +385,48 @@ exports.getRenewalReport = async (req, res) => {
     });
   }
 };
+
+// ==================== BULK DELETE ====================
+// @desc    Bulk delete policies
+// @route   DELETE /api/mediclaim/policies/bulk-delete
+// @access  HR only
+exports.bulkDeletePolicies = async (req, res) => {
+  try {
+    const { policyIds } = req.body;
+
+    if (!policyIds || policyIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No policies selected for deletion'
+      });
+    }
+
+    // Safety Check: Prevent deleting policies that still have enrollments
+    const activeEnrollments = await MediclaimEnrollment.countDocuments({
+      policyId: { $in: policyIds }
+    });
+
+    if (activeEnrollments > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete selected policies. ${activeEnrollments} enrollment(s) are linked to them.`
+      });
+    }
+
+    // Perform the bulk delete
+    const result = await MediclaimPolicy.deleteMany({ _id: { $in: policyIds } });
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} policy(ies) deleted successfully`
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete policy error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to bulk delete policies',
+      error: error.message
+    });
+  }
+};

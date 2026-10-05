@@ -1238,7 +1238,8 @@ import {
   Phone as PhoneIcon,
   LocationOn as LocationIcon,
   Work as WorkIcon,
-  AccessTime as AccessTimeIcon
+  AccessTime as AccessTimeIcon,
+  Delete as DeleteIcon // 👈 Added for bulk delete button
 } from "@mui/icons-material";
 import axios from "axios";
 import BASE_URL from "../../../config/Config";
@@ -1513,6 +1514,7 @@ const AdminLeaveApproval = () => {
   const canViewPage = checkPermission(ACTIONS.VIEW);
   const canApprove = checkPermission(ACTIONS.APPROVE);
   const canReject = checkPermission(ACTIONS.REJECT);
+  const canDelete = checkPermission(ACTIONS.DELETE); // 👈 Added delete permission
 
   // Debounce search
   useEffect(() => {
@@ -1594,7 +1596,7 @@ const AdminLeaveApproval = () => {
   };
 
   const handleSelectAll = (event) => {
-    if (!canApprove && !canReject && !isSuperAdmin) {
+    if (!canApprove && !canReject && !canDelete && !isSuperAdmin) {
       showSnackbar("You don't have permission to perform bulk actions", "error");
       return;
     }
@@ -1607,7 +1609,7 @@ const AdminLeaveApproval = () => {
   };
 
   const handleSelect = (id) => {
-    if (!canApprove && !canReject && !isSuperAdmin) {
+    if (!canApprove && !canReject && !canDelete && !isSuperAdmin) {
       showSnackbar("You don't have permission to perform bulk actions", "error");
       return;
     }
@@ -1622,6 +1624,40 @@ const AdminLeaveApproval = () => {
     }
     
     setSelected(newSelected);
+  };
+
+  // 👇 Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (!canDelete && !isSuperAdmin) {
+      showSnackbar("You don't have permission to delete leave applications", "error");
+      return;
+    }
+    
+    if (selected.length === 0) return;
+
+    try {
+      setLoading(true);
+      const response = await axios.delete(`${BASE_URL}/api/leaves/bulk`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { leaveIds: selected } // Axios sends body inside 'data' for DELETE
+      });
+
+      if (response.data.success) {
+        showSnackbar(response.data.message || `${selected.length} leave application(s) deleted successfully`, "success");
+        setSelected([]); // Clear the checkboxes
+        await fetchPendingLeaves(); // Refresh the table
+      } else {
+        showSnackbar(response.data.message || "Failed to delete leave applications", "error");
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      showSnackbar(
+        error.response?.data?.message || "Failed to delete leave applications",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleProcessClick = (leave, action) => {
@@ -1997,6 +2033,32 @@ const AdminLeaveApproval = () => {
 
           {/* Action Buttons */}
           <Stack direction="row" spacing={1.5} alignItems="center">
+            {/* 👇 Bulk Delete Button - Only show if user has delete permission AND items are selected */}
+            {(canDelete || isSuperAdmin) && selected.length > 0 && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                onClick={handleBulkDelete}
+                disabled={loading}
+                sx={{
+                  height: 36,
+                  borderRadius: 1.5,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  borderColor: '#fee2e2',
+                  color: '#991b1b',
+                  '&:hover': {
+                    borderColor: '#fecaca',
+                    bgcolor: '#fee2e2'
+                  }
+                }}
+              >
+                Delete ({selected.length})
+              </Button>
+            )}
+
             <Button
               variant="contained"
               startIcon={<RefreshIcon sx={{ fontSize: '1rem' }} />}
@@ -2040,8 +2102,8 @@ const AdminLeaveApproval = () => {
                   py: 1.5
                 }
               }}>
-                {/* Checkbox Column - Only show if user has approve or reject permission */}
-                {(canApprove || canReject || isSuperAdmin) && (
+                {/* Checkbox Column - Only show if user has approve, reject, or delete permission */}
+                {(canApprove || canReject || canDelete || isSuperAdmin) && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
                       indeterminate={selected.length > 0 && selected.length < paginatedData.length}
@@ -2126,7 +2188,7 @@ const AdminLeaveApproval = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={(canApprove || canReject || isSuperAdmin) ? 8 : 7} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={(canApprove || canReject || canDelete || isSuperAdmin) ? 8 : 7} align="center" sx={{ py: 6 }}>
                     <CircularProgress size={32} sx={{ color: COLORS.primary }} />
                     <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary, mt: 1 }}>
                       Loading leave applications...
@@ -2135,7 +2197,7 @@ const AdminLeaveApproval = () => {
                 </TableRow>
               ) : paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={(canApprove || canReject || isSuperAdmin) ? 8 : 7} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={(canApprove || canReject || canDelete || isSuperAdmin) ? 8 : 7} align="center" sx={{ py: 6 }}>
                     <Box sx={{ textAlign: 'center' }}>
                       <EventIcon sx={{ fontSize: 48, color: COLORS.text.tertiary, mb: 1 }} />
                       <Typography variant="body1" sx={{ fontSize: '0.875rem', color: COLORS.text.secondary, fontWeight: 500 }}>
@@ -2183,8 +2245,8 @@ const AdminLeaveApproval = () => {
                         }
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has approve or reject permission */}
-                      {(canApprove || canReject || isSuperAdmin) && (
+                      {/* Checkbox Column - Only show if user has approve, reject, or delete permission */}
+                      {(canApprove || canReject || canDelete || isSuperAdmin) && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox
                             checked={isSelected}

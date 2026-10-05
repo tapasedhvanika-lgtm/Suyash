@@ -41,7 +41,6 @@ class ProductionController {
       const currentDate = new Date();
       const today = new Date(currentDate.setHours(0, 0, 0, 0));
 
-      // Check if date is valid
       if (isNaN(productionDate.getTime())) {
         return res.status(400).json({
           success: false,
@@ -49,7 +48,6 @@ class ProductionController {
         });
       }
 
-      // Production date cannot be in the future
       if (productionDate > today) {
         return res.status(400).json({
           success: false,
@@ -59,7 +57,6 @@ class ProductionController {
     }
     // ==================== END DATE VALIDATION ====================
     
-    // Check employee exists and is piece-rate
     const employee = await Employee.findById(employeeId);
     if (!employee) {
       return res.status(404).json({
@@ -75,7 +72,6 @@ class ProductionController {
       });
     }
     
-    // FETCH ACTIVE RATE FROM PIECERATEMASTER
     const activeRate = await PieceRateMaster.findOne({
       productType: productName,
       operation: operation,
@@ -96,15 +92,12 @@ class ProductionController {
 
     const ratePerUnit = activeRate.ratePerUnit;
     
-    // Parse numeric values for correct calculation
     const parsedGoodUnits = parseInt(goodUnits);
     const parsedQualityBonus = parseFloat(qualityBonus || 0);
     const parsedEfficiencyBonus = parseFloat(efficiencyBonus || 0);
     
-    // Calculate daily earning correctly
     const dailyEarning = (parsedGoodUnits * ratePerUnit) + parsedQualityBonus + parsedEfficiencyBonus;
     
-    // Create production record with rateMasterId
     const production = new Production({
       EmployeeID: employeeId,
       Date: productionDate,
@@ -126,18 +119,17 @@ class ProductionController {
       Remarks: remarks,
       Status: 'Pending',
       CreatedBy: req.user?._id,
-      DailyEarning: dailyEarning // Correctly calculated
+      DailyEarning: dailyEarning
     });
     
     await production.save();
     
-    // Populate employee details
     await production.populate('EmployeeID', 'EmployeeID FirstName LastName DepartmentID DesignationID');
     
     return res.status(201).json({
       success: true,
       message: 'Production recorded successfully',
-      data: production  // Response structure remains EXACTLY the same
+      data: production
     });
     
   } catch (error) {
@@ -149,6 +141,7 @@ class ProductionController {
     });
   }
 }
+
   // Get production by employee and date range
   async getEmployeeProduction(req, res) {
     try {
@@ -180,15 +173,12 @@ class ProductionController {
         .populate('EmployeeID', 'EmployeeID FirstName LastName')
         .populate('VerifiedBy', 'EmployeeID FirstName LastName')
         .populate('ApprovedBy', 'EmployeeID FirstName LastName')
-        //  Optionally populate rateMasterId if you want to show rate details
-        // .populate('rateMasterId', 'productType operation ratePerUnit uom')
         .sort({ Date: -1 })
         .limit(parseInt(limit))
         .skip(skip);
       
       const total = await Production.countDocuments(query);
       
-      // Calculate totals
       const totals = await Production.aggregate([
         { $match: query },
         {
@@ -256,19 +246,16 @@ class ProductionController {
       
       const query = {};
       
-      // Date range filter
       if (startDate || endDate) {
         query.Date = {};
         if (startDate) query.Date.$gte = new Date(startDate);
         if (endDate) query.Date.$lte = new Date(endDate);
       }
       
-      // Employee filter
       if (employeeId) {
         query.EmployeeID = employeeId;
       }
       
-      // Department filter
       let employeeIds = [];
       if (departmentId) {
         const employees = await Employee.find({ DepartmentID: departmentId }).select('_id');
@@ -287,7 +274,6 @@ class ProductionController {
         }
       }
       
-      // Search by employee name or product
       if (searchTerm) {
         const aggregationPipeline = [
           {
@@ -316,11 +302,7 @@ class ProductionController {
           { $sort: { Date: -1 } },
           { $skip: (page - 1) * limit },
           { $limit: parseInt(limit) },
-          {
-            $project: {
-              'employee.password': 0
-            }
-          }
+          { $project: { 'employee.password': 0 } }
         ];
         
         const countPipeline = [
@@ -366,7 +348,6 @@ class ProductionController {
         });
       }
       
-      // Regular query without search
       const skip = (page - 1) * limit;
       
       const productions = await Production.find(query)
@@ -378,7 +359,6 @@ class ProductionController {
       
       const total = await Production.countDocuments(query);
       
-      // Get summary statistics for pending productions
       const summary = await Production.aggregate([
         { $match: { Status: 'Pending' } },
         {
@@ -443,7 +423,6 @@ class ProductionController {
         });
       }
       
-      // Update based on status
       if (status === 'Verified') {
         production.Status = 'Verified';
         production.VerifiedBy = req.user?._id;
@@ -498,7 +477,6 @@ class ProductionController {
       
       for (const prod of productions) {
         try {
-          //  FETCH ACTIVE RATE FOR EACH PRODUCTION
           const activeRate = await PieceRateMaster.findOne({
             productType: prod.productName,
             operation: prod.operation,
@@ -517,8 +495,8 @@ class ProductionController {
           const production = new Production({
             ...prod,
             Date: prod.date ? new Date(prod.date) : new Date(),
-            RatePerUnit: activeRate.ratePerUnit,  // Use rate from master
-            rateMasterId: activeRate._id,         // Link to master
+            RatePerUnit: activeRate.ratePerUnit,
+            rateMasterId: activeRate._id,
             Status: 'Pending',
             CreatedBy: req.user?._id
           });
@@ -582,11 +560,8 @@ class ProductionController {
       
       const productions = await Production.find(query)
         .populate('EmployeeID', 'EmployeeID FirstName LastName EmploymentType')
-        //  Optionally populate rateMasterId for rate history
-        // .populate('rateMasterId', 'productType operation ratePerUnit uom')
         .sort({ EmployeeID: 1, Date: 1 });
       
-      // Group by employee
       const grouped = productions.reduce((acc, prod) => {
         const empId = prod.EmployeeID._id.toString();
         if (!acc[empId]) {
@@ -636,45 +611,73 @@ class ProductionController {
   }
   
   // Mark production as paid (link to salary)
- async markAsPaid(req, res) {
-  try {
-    const { productionIds } = req.body;
-    
-    if (!Array.isArray(productionIds) || productionIds.length === 0) {
-      return res.status(400).json({
+  async markAsPaid(req, res) {
+    try {
+      const { productionIds } = req.body;
+      
+      if (!Array.isArray(productionIds) || productionIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'productionIds is required and must be a non-empty array'
+        });
+      }
+      
+      const result = await Production.updateMany(
+        { _id: { $in: productionIds } },
+        {
+          $set: {
+            SalaryProcessed: true,
+            Status: 'Paid'
+          },
+          $unset: {
+            SalaryID: ""
+          }
+        }
+      );
+      
+      return res.json({
+        success: true,
+        message: `${result.modifiedCount} production records marked as paid`,
+        modifiedCount: result.modifiedCount
+      });
+      
+    } catch (error) {
+      console.error('Error marking production as paid:', error);
+      return res.status(500).json({
         success: false,
-        message: 'productionIds is required and must be a non-empty array'
+        message: 'Internal server error',
+        error: error.message
       });
     }
-    
-    const result = await Production.updateMany(
-      { _id: { $in: productionIds } },
-      {
-        $set: {
-          SalaryProcessed: true,
-          Status: 'Paid'
-        },
-        $unset: {
-          SalaryID: "" // This will remove the SalaryID field if it exists
-        }
-      }
-    );
-    
-    return res.json({
-      success: true,
-      message: `${result.modifiedCount} production records marked as paid`,
-      modifiedCount: result.modifiedCount
-    });
-    
-  } catch (error) {
-    console.error('Error marking production as paid:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error',
-      error: error.message
-    });
   }
-}
+
+  // 👇 ADDED: Bulk delete production records (as a class method)
+  async bulkDeleteProduction(req, res) {
+    try {
+      const { productionIds } = req.body;
+
+      if (!productionIds || productionIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No production records selected for deletion'
+        });
+      }
+
+      const result = await Production.deleteMany({ _id: { $in: productionIds } });
+
+      return res.status(200).json({
+        success: true,
+        message: `${result.deletedCount} production record(s) deleted successfully`
+      });
+
+    } catch (error) {
+      console.error('❌ Bulk delete production error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Server error: ' + error.message
+      });
+    }
+  }
 }
 
 module.exports = new ProductionController();

@@ -450,6 +450,55 @@ exports.deleteAccident = async (req, res) => {
   }
 };
 
+// ✅ NEW: Bulk delete accidents
+exports.bulkDeleteAccidents = async (req, res) => {
+  try {
+    // Accept both 'ids' and 'accidentIds' for flexibility
+    const { ids, accidentIds } = req.body;
+    const incomingIds = ids || accidentIds;
+
+    if (!incomingIds || !Array.isArray(incomingIds) || incomingIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No accidents selected for deletion'
+      });
+    }
+
+    // Filter to valid ObjectIds only
+    const validIds = incomingIds.filter(id => id && id.match(/^[0-9a-fA-F]{24}$/));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid accident IDs provided'
+      });
+    }
+
+    const result = await Accident.deleteMany({ _id: { $in: validIds } });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No accident records found with the given IDs'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} accident record(s) deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete accidents error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
 exports.getEmployeeAccidents = async (req, res) => {
   try {
     const { employeeId } = req.params;

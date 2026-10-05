@@ -1850,6 +1850,9 @@ const CandidateMaster = () => {
     severity: "success",
   });
 
+  // ✅ NEW: Bulk delete loading state
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
   // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -1927,7 +1930,6 @@ const CandidateMaster = () => {
 
   // Fetch candidates
   const fetchCandidates = useCallback(async () => {
-    // Only fetch if user has view permission
     if (!canViewPage && !isSuperAdmin) return;
     
     try {
@@ -2115,16 +2117,57 @@ const CandidateMaster = () => {
     showNotification("Data refreshed", "success");
   };
 
-  const handleBulkDelete = () => {
+  // ✅ UPDATED: Handle bulk delete — now calls the actual API
+  const handleBulkDelete = async () => {
     if (!canDelete && !isSuperAdmin) {
       showNotification('You do not have permission to delete candidates', 'error');
       return;
     }
     if (selected.length === 0) return;
-    showNotification(
-      `Bulk delete for ${selected.length} items - API implementation required`,
-      "warning",
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selected.length} candidate(s)? This action cannot be undone.`
     );
+    if (!confirmDelete) return;
+
+    try {
+      setBulkDeleteLoading(true);
+      const token = localStorage.getItem("token");
+
+      const response = await axios.delete(`${BASE_URL}/api/candidates/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        data: { ids: selected }, // DELETE with body
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} candidate(s) deleted successfully`,
+          "success"
+        );
+
+        // Remove deleted rows from local state immediately for snappy UI
+        const selectedIds = [...selected];
+        setCandidates((prev) => prev.filter((c) => !selectedIds.includes(c._id)));
+        setSelected([]);
+
+        // Then refresh from server to stay in sync
+        fetchCandidates();
+      } else {
+        showNotification(response.data.message || "Failed to delete candidates", "error");
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      showNotification(
+        error.response?.data?.message || "Server error during bulk delete",
+        "error"
+      );
+    } finally {
+      setBulkDeleteLoading(false);
+    }
   };
 
   const showNotification = (message, severity) => {
@@ -2142,12 +2185,10 @@ const CandidateMaster = () => {
 
   const isFilterActive = statusFilter || sourceFilter || searchTerm;
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage && !isSuperAdmin) {
     return <AccessDenied />;
   }
@@ -2266,13 +2307,18 @@ const CandidateMaster = () => {
           </Stack>
 
           <Stack direction="row" spacing={1.5}>
-            {/* Bulk Delete Button - Only show if user has delete permission */}
+            {/* ✅ Bulk Delete Button - now wired to API */}
             {(canDelete || isSuperAdmin) && selected.length > 0 && (
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={<DeleteIcon sx={{ fontSize: "1rem" }} />}
+                startIcon={
+                  bulkDeleteLoading 
+                    ? <CircularProgress size={16} color="inherit" />
+                    : <DeleteIcon sx={{ fontSize: "1rem" }} />
+                }
                 onClick={handleBulkDelete}
+                disabled={loading || bulkDeleteLoading}
                 sx={{
                   height: 36,
                   borderRadius: 1.5,
@@ -2284,7 +2330,7 @@ const CandidateMaster = () => {
                   "&:hover": { borderColor: "#fecaca", bgcolor: "#fee2e2" },
                 }}
               >
-                Delete ({selected.length})
+                {bulkDeleteLoading ? 'Deleting...' : `Delete (${selected.length})`}
               </Button>
             )}
 
@@ -2335,7 +2381,6 @@ const CandidateMaster = () => {
                   },
                 }}
               >
-                {/* Checkbox Column - Only show if user has delete permission */}
                 {(canDelete || isSuperAdmin) && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
@@ -2519,7 +2564,6 @@ const CandidateMaster = () => {
                         },
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has delete permission */}
                       {(canDelete || isSuperAdmin) && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox

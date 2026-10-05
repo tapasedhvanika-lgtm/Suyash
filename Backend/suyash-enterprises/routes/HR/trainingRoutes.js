@@ -523,6 +523,8 @@ router.get("/all", trainingController.getTrainings);
 // Get Trainings by Employee
 router.get("/employee/:employeeId", trainingController.getEmployeeTraining);
 
+router.delete("/bulk", trainingController.bulkDeleteTrainings);
+
 // Update Training
 router.put("/update/:id", trainingController.updateTraining);
 

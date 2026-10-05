@@ -24,7 +24,6 @@ const parseExperienceForJob = (experienceString) => {
   
   const str = experienceString.toString().trim();
   
-  // Handle "0-1", "2-3", "5-7" format
   if (str.includes('-')) {
     const parts = str.split('-');
     const min = parseInt(parts[0]);
@@ -34,7 +33,6 @@ const parseExperienceForJob = (experienceString) => {
     }
   }
   
-  // Handle "5+", "10+" format
   if (str.includes('+')) {
     const min = parseInt(str);
     if (!isNaN(min)) {
@@ -42,12 +40,10 @@ const parseExperienceForJob = (experienceString) => {
     }
   }
   
-  // Handle "Fresher"
   if (str.toLowerCase() === 'fresher') {
     return { min: 0, max: 0 };
   }
   
-  // Handle "<1"
   if (str.startsWith('<')) {
     const max = parseInt(str.substring(1));
     if (!isNaN(max)) {
@@ -55,13 +51,11 @@ const parseExperienceForJob = (experienceString) => {
     }
   }
   
-  // Default fallback - treat as number
   const num = parseInt(str);
   if (!isNaN(num)) {
     return { min: num, max: num + 2 };
   }
   
-  // If all fails, set default
   return { min: 0, max: 5 };
 };
 
@@ -79,7 +73,6 @@ const createJobOpening = async (req, res) => {
       responsibilities
     } = req.body;
 
-    // Validate required fields
     if (!requisitionId) {
       return res.status(400).json({
         success: false,
@@ -94,7 +87,6 @@ const createJobOpening = async (req, res) => {
       });
     }
 
-    // Validate requisitionId format
     if (!mongoose.Types.ObjectId.isValid(requisitionId)) {
       return res.status(400).json({
         success: false,
@@ -102,7 +94,6 @@ const createJobOpening = async (req, res) => {
       });
     }
 
-    // Find requisition
     const requisition = await Requisition.findById(requisitionId);
     if (!requisition) {
       return res.status(404).json({
@@ -111,7 +102,6 @@ const createJobOpening = async (req, res) => {
       });
     }
 
-    // Check if requisition is approved
     if (requisition.status !== 'approved') {
       return res.status(400).json({
         success: false,
@@ -119,7 +109,6 @@ const createJobOpening = async (req, res) => {
       });
     }
 
-    // Check if job already exists for this requisition
     const existingJob = await JobOpening.findOne({ requisitionId: requisition._id });
     if (existingJob) {
       return res.status(400).json({
@@ -128,17 +117,14 @@ const createJobOpening = async (req, res) => {
       });
     }
 
-    // Parse experience string to numbers for the job
     const experienceValues = parseExperienceForJob(requisition.experienceYears);
 
-    // Prepare publish platforms
     const publishPlatforms = Array.isArray(publishTo) ? publishTo : ['careerPage'];
     const publishData = publishPlatforms.map(platform => ({
       platform,
       status: 'pending'
     }));
 
-    // Create job opening
     const jobData = {
       requisitionId: requisition._id,
       requisitionNumber: requisition.requisitionId,
@@ -171,11 +157,9 @@ const createJobOpening = async (req, res) => {
 
     const job = await JobOpening.create(jobData);
 
-    // Update requisition status
     requisition.status = 'in_progress';
     await requisition.save();
 
-    // Log audit
     await auditService.log(
       'CREATE',
       'JobOpening',
@@ -201,7 +185,6 @@ const createJobOpening = async (req, res) => {
   } catch (error) {
     console.error('Create job opening error:', error);
 
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -210,7 +193,6 @@ const createJobOpening = async (req, res) => {
       });
     }
 
-    // Handle duplicate key error
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -218,7 +200,6 @@ const createJobOpening = async (req, res) => {
       });
     }
 
-    // Handle any other errors
     res.status(500).json({
       success: false,
       message: 'Server error: ' + error.message
@@ -256,16 +237,13 @@ const publishJob = async (req, res) => {
       });
     }
 
-    // Determine which platforms to publish to
     const platformsToPublish = platforms || job.publishTo.map(p => p.platform);
 
-    // Publish to each platform
     const publishResults = [];
     for (const platform of platformsToPublish) {
       const result = await jobBoardService.publishJob(job, platform);
       publishResults.push(result);
       
-      // Update job publish status
       const publishEntry = job.publishTo.find(p => p.platform === platform);
       if (publishEntry) {
         publishEntry.status = result.success ? 'published' : 'failed';
@@ -275,13 +253,11 @@ const publishJob = async (req, res) => {
       }
     }
 
-    // Update job status
     const allPublished = job.publishTo.every(p => p.status === 'published');
     job.status = allPublished ? 'published' : 'open';
     job.publishedAt = allPublished ? new Date() : null;
     await job.save();
 
-    // Log audit
     await auditService.log(
       'PUBLISH',
       'JobOpening',
@@ -338,11 +314,9 @@ const getJobs = async (req, res) => {
       ];
     }
 
-    // Role-based filtering
     const user = req.user;
     const userRole = user.RoleName;
 
-    // SuperAdmin/CEO sees all, others see only published or their own
     if (!['SuperAdmin', 'CEO', 'HR'].includes(userRole)) {
       filter.status = { $in: ['published', 'open'] };
     }
@@ -365,7 +339,6 @@ const getJobs = async (req, res) => {
       JobOpening.countDocuments(filter)
     ]);
 
-    // Add application counts
     const Application = require('../../models/HR/Application');
     for (let job of jobs) {
       job.applicationCount = await Application.countDocuments({ jobId: job._id });
@@ -418,7 +391,6 @@ const getJobById = async (req, res) => {
       });
     }
 
-    // Get applications for this job
     const Application = require('../../models/HR/Application');
     const applications = await Application.find({ jobId: job._id })
       .populate('candidateId', 'firstName lastName email phone')
@@ -463,14 +435,6 @@ const updateJob = async (req, res) => {
         message: 'Job not found'
       });
     }
-
-    // Only allow updates if job is in draft
-    //if (job.status !== 'draft') {
-      //return res.status(400).json({
-       // success: false,
-       // message: 'Can only update jobs in draft status'
-     // });
-   // }
 
     if (job.status === 'closed' || job.status === 'cancelled') {
       return res.status(400).json({
@@ -547,10 +511,8 @@ const deleteJob = async (req, res) => {
       });
     }
 
-    // Hard delete the job
     await JobOpening.findByIdAndDelete(id);
 
-    // Log audit
     await auditService.log(
       'DELETE',
       'JobOpening',
@@ -573,6 +535,86 @@ const deleteJob = async (req, res) => {
 
   } catch (error) {
     console.error('Delete job error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+};
+
+// ✅ NEW: @desc    Bulk delete job openings
+// @route   DELETE /api/jobs/bulk
+// @access  Private (HR/SuperAdmin)
+const bulkDeleteJobs = async (req, res) => {
+  try {
+    // Accept both 'ids' and 'jobIds' for flexibility
+    const { ids, jobIds } = req.body;
+    const incomingIds = ids || jobIds;
+
+    if (!incomingIds || !Array.isArray(incomingIds) || incomingIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No job openings selected for deletion'
+      });
+    }
+
+    // Filter to valid ObjectIds only
+    const validIds = incomingIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid job IDs provided'
+      });
+    }
+
+    // Find all matching jobs first (for audit logging)
+    const jobs = await JobOpening.find({ _id: { $in: validIds } });
+
+    if (jobs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No job openings found with the given IDs'
+      });
+    }
+
+    // Hard delete all matching jobs
+    const result = await JobOpening.deleteMany({ _id: { $in: validIds } });
+
+    // Optionally delete related applications? Only if you want cascading deletes.
+    // Skipping for safety — you might want to keep applications for records.
+    // Uncomment below if you want to cascade-delete applications:
+    // const Application = require('../../models/HR/Application');
+    // await Application.deleteMany({ jobId: { $in: validIds } });
+
+    // Log audit for each deleted job
+    for (const job of jobs) {
+      try {
+        await auditService.log(
+          'DELETE',
+          'JobOpening',
+          job._id,
+          req.user,
+          {
+            jobId: job.jobId,
+            title: job.title,
+            action: 'bulk_delete'
+          },
+          req
+        );
+      } catch (auditErr) {
+        console.warn('Audit log failed for', job._id, auditErr.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} job opening(s) deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete jobs error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error: ' + error.message
@@ -614,7 +656,6 @@ const closeJob = async (req, res) => {
     job.closedAt = new Date();
     await job.save();
 
-    // Update requisition if needed
     if (job.requisitionId) {
       await Requisition.findByIdAndUpdate(job.requisitionId, {
         status: 'filled',
@@ -656,5 +697,6 @@ module.exports = {
   getJobById,
   updateJob,
   closeJob,
-  deleteJob
+  deleteJob,
+  bulkDeleteJobs // ✅ Added
 };
