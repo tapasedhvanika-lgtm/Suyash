@@ -1,5 +1,5 @@
 // services/Quality/inspectionResultService.js
-const WorkOrder = require('../../models/Production/WorkOrder');
+const { WorkOrder } = require('../../models/Production/WorkOrder');
 
 /**
  * Computes overall_result from checkpoint results.

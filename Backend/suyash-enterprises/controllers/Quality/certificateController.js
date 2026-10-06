@@ -274,3 +274,42 @@ exports.markAsSent = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+// ======================================================
+// DELETE QUALITY CERTIFICATE
+// DELETE /api/quality-certificates/:id
+// ======================================================
+exports.deleteCertificate = async (req, res) => {
+  try {
+    const certificate = await QualityCertificate.findById(req.params.id);
+
+    if (!certificate) {
+      return res.status(404).json({
+        success: false,
+        message: 'Certificate not found'
+      });
+    }
+
+    // Delete PDF file if it exists
+    if (
+      certificate.certificate_path &&
+      fs.existsSync(certificate.certificate_path)
+    ) {
+      fs.unlinkSync(certificate.certificate_path);
+    }
+
+    await QualityCertificate.findByIdAndDelete(req.params.id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Quality certificate deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete certificate error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};

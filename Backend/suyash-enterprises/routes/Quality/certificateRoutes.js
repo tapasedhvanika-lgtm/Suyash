@@ -7,6 +7,7 @@ const {
   getCertificateByWO,
   downloadCertificate,
   markAsSent,
+  deleteCertificate,
   getAllCertificates,
 } = require('../../controllers/Quality/certificateController');
 const { protect, authorize } = require('../../middleware/authMiddleware');
@@ -435,6 +436,14 @@ router.put('/quality-certificates/:id/mark-sent', markAsSent);
 */
 
 router.get('/quality-certificates',  getAllCertificates);
- 
+ // ======================================================
+// DELETE QUALITY CERTIFICATE
+// ======================================================
+router.delete(
+  '/quality-certificates/:id',
+  authorize('admin', 'manager', 'qc'),
+  deleteCertificate
+);
+
 
 module.exports = router;
