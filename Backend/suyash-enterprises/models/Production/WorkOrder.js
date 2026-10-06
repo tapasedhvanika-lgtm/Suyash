@@ -244,12 +244,12 @@ functional_tests_passed: { type: Boolean, default: false },
 
 // ─── Virtuals ─────────────────────────────────────────────────────────────────
 workOrderSchema.virtual('actual_process_hours').get(function () {
-  return this.labour_bookings.reduce((sum, b) => sum + (b.hours_booked || 0), 0);
+ return (this.labour_bookings || []).reduce((sum, b) => sum + (b.hours_booked || 0), 0);
 });
 
 workOrderSchema.virtual('all_operations_completed').get(function () {
-  return this.operations.length > 0 &&
-    this.operations.every(op => op.status === 'Completed' || op.status === 'Skipped');
+  return (this.operations || []).length > 0 &&    
+  this.operations.every(op => op.status === 'Completed' || op.status === 'Skipped');
 });
 
 // ─── Statics: validate status transitions ────────────────────────────────────

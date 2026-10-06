@@ -53,7 +53,7 @@ exports.initiateVerification = async (req, res) => {
       warehouse_id,
       verification_type,
       conducted_by,
-      witness,
+      witness: witness || null,
       variance_threshold_percent,
       variance_threshold_amount,
       remarks
@@ -687,6 +687,50 @@ exports.getActiveVerification = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch active verification',
+      error: error.message
+    });
+  }
+};
+
+// ======================================================
+// DELETE PHYSICAL STOCK VERIFICATION
+// DELETE /api/physical-verifications/:id
+// ======================================================
+
+exports.deleteVerification = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const psv = await PhysicalStockVerification.findById(id);
+
+    if (!psv) {
+      return res.status(404).json({
+        success: false,
+        message: 'PSV not found'
+      });
+    }
+
+    // Do not allow deletion of completed/approved/closed PSV
+    if (['Count Completed', 'Under Review', 'Approved', 'Closed'].includes(psv.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete PSV in status: ${psv.status}`
+      });
+    }
+
+    await PhysicalStockVerification.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Physical verification deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('[PSV] deleteVerification:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete verification',
       error: error.message
     });
   }
