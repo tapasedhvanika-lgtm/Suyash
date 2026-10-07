@@ -648,6 +648,52 @@ const downloadQuotationAsTemplate = async (req, res) => {
     res.end();
   } catch (e) { return err(res, e.message); }
 };
+// @desc    Delete quotation (soft delete)
+// @route   DELETE /api/quotations/:id
+// @access  Private
+const deleteQuotation = async (req, res) => {
+  try {
+    const quotation = await Quotation.findById(req.params.id);
+
+    if (!quotation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Quotation not found'
+      });
+    }
+
+    if (!quotation.IsActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quotation is already inactive'
+      });
+    }
+
+    quotation.IsActive = false;
+    quotation.UpdatedBy = req.user._id;
+
+    await quotation.save();
+
+    res.json({
+      success: true,
+      message: 'Quotation deleted successfully'
+    });
+  } catch (error) {
+    console.error('deleteQuotation error:', error);
+
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({
+        success: false,
+        message: 'Quotation not found'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
 
 module.exports = {
   getQuotations,
@@ -660,5 +706,6 @@ module.exports = {
   sendQuotation,
   approveQuotation,
   rejectQuotation,
+  deleteQuotation,
   calculateItemCost,
 };

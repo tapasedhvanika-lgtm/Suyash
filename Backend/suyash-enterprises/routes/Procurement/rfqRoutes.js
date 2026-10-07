@@ -7,6 +7,7 @@ const {
   getAllRFQs,
   getRFQById,
   closeRFQ,
+  bulkDeleteRFQs,
   
   // RFQ Workflow Actions
   sendRFQ,
@@ -836,6 +837,7 @@ router.put('/:id/select-vendor', protect, selectVendor);
  *       500:
  *         description: Server error
  */
+router.post('/bulk-delete', protect, bulkDeleteRFQs);
 router.put('/:id/close', protect, closeRFQ);
 
 module.exports = router;
