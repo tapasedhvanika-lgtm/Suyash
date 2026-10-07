@@ -616,6 +616,11 @@ import {
   ListItemText,
   Alert,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
  
 } from '@mui/material';
 import {
@@ -634,6 +639,7 @@ import {
   AccountBalance as AdvanceIcon,
   MoneyOff as BounceIcon,
   Phone as PhoneIcon,
+   Close as CloseIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import BASE_URL from '../../../config/Config';
@@ -705,7 +711,7 @@ const formatDate = (dateString) => {
 };
 
 // Action Menu Component - WITH PERMISSION CHECKS
-const ActionMenu = ({ record, onApplyAdvance, onBounce, onFollowUp, anchorEl, onClose, onOpen, permissions, isSuperAdmin }) => {
+const ActionMenu = ({ record, onViewDetails, onApplyAdvance, onBounce, onFollowUp, anchorEl, onClose, onOpen, permissions, isSuperAdmin }) => {
   const canView = isSuperAdmin || hasPermission(permissions, MODULES.PAYMENT_RECEIPT, PAGES.PAYMENT_RECEIPT, ACTIONS.VIEW);
   const canCreate = isSuperAdmin || hasPermission(permissions, MODULES.PAYMENT_RECEIPT, PAGES.PAYMENT_RECEIPT, ACTIONS.CREATE);
   const canUpdate = isSuperAdmin || hasPermission(permissions, MODULES.PAYMENT_RECEIPT, PAGES.PAYMENT_RECEIPT, ACTIONS.UPDATE);
@@ -721,12 +727,12 @@ const ActionMenu = ({ record, onApplyAdvance, onBounce, onFollowUp, anchorEl, on
       </Tooltip>
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onClose} PaperProps={{ elevation: 3, sx: { mt: 1, minWidth: 180, borderRadius: 2, border: `1px solid ${COLORS.border}` } }}>
         {/* View Details - VIEW permission */}
-        {canView && (
-          <MenuItem onClick={onClose} sx={{ py: 1.5 }}>
-            <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><VisibilityIcon fontSize="small" /></ListItemIcon>
-            <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>View Details</Typography></ListItemText>
-          </MenuItem>
-        )}
+{canView && (
+  <MenuItem onClick={() => { onViewDetails(record); onClose(); }} sx={{ py: 1.5 }}>
+    <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><VisibilityIcon fontSize="small" /></ListItemIcon>
+    <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>View Details</Typography></ListItemText>
+  </MenuItem>
+)}
         
         {/* Apply Advance - CREATE permission */}
         {canCreate && (
@@ -788,6 +794,7 @@ const PaymentReceiptMaster = () => {
   const [openBounceDialog, setOpenBounceDialog] = useState(false);
   const [openFollowUpDialog, setOpenFollowUpDialog] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [openViewDetailsDialog, setOpenViewDetailsDialog] = useState(false);
   
   // Notification state
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -1010,7 +1017,15 @@ const PaymentReceiptMaster = () => {
     setOpenFollowUpDialog(true);
     handleActionMenuClose();
   };
-
+    const handleViewDetails = (receipt) => {
+  if (!canViewPage) {
+    showNotification('You don\'t have permission to view details', 'error');
+    return;
+  }
+  setSelectedReceipt(receipt);
+  setOpenViewDetailsDialog(true);
+  handleActionMenuClose();
+};
   const handleApplyAdvanceSuccess = () => {
     setOpenApplyAdvanceDialog(false);
     setSelectedReceipt(null);
@@ -1242,6 +1257,7 @@ const PaymentReceiptMaster = () => {
                       <TableCell align="center">
                         <ActionMenu 
                           record={receipt} 
+                          onViewDetails={handleViewDetails}
                           onApplyAdvance={handleApplyAdvance}
                           onBounce={handleBounce}
                           onFollowUp={handleFollowUp}
@@ -1314,6 +1330,83 @@ const PaymentReceiptMaster = () => {
           onSuccess={handleFollowUpSuccess}
         />
       )}
+      {/* ⭐ VIEW DETAILS DIALOG — YAHAN ADD KARO ⭐ */}
+<Dialog 
+  open={openViewDetailsDialog} 
+  onClose={() => { setOpenViewDetailsDialog(false); setSelectedReceipt(null); }} 
+  maxWidth="md" 
+  fullWidth
+>
+  <DialogTitle sx={{ borderBottom: `1px solid ${COLORS.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: COLORS.text.primary }}>
+      Payment Receipt Details
+    </Typography>
+    <IconButton onClick={() => { setOpenViewDetailsDialog(false); setSelectedReceipt(null); }} size="small">
+      <CloseIcon fontSize="small" />
+    </IconButton>
+  </DialogTitle>
+  <DialogContent sx={{ p: 3 }}>
+    {selectedReceipt ? (
+      <Stack spacing={2}>
+        <Box>
+          <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Receipt Number</Typography>
+          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: COLORS.primary }}>
+            {selectedReceipt.receipt_no}
+          </Typography>
+        </Box>
+        <Divider />
+        <Stack direction="row" spacing={4}>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Receipt Date</Typography>
+            <Typography sx={{ fontSize: '0.85rem' }}>{formatDate(selectedReceipt.receipt_date)}</Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Payment Mode</Typography>
+            <Typography sx={{ fontSize: '0.85rem' }}>{selectedReceipt.payment_mode}</Typography>
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={4}>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Customer</Typography>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>{selectedReceipt.customer_name}</Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Status</Typography>
+            <Chip label={selectedReceipt.status} size="small" sx={{ bgcolor: COLORS.primaryLight, color: COLORS.primary, fontWeight: 600 }} />
+          </Box>
+        </Stack>
+        <Divider />
+        <Box>
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.8rem' }}>Total Amount:</Typography>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>₹{formatCurrency(selectedReceipt.total_amount)}</Typography>
+          </Stack>
+          {selectedReceipt.tds_amount > 0 && (
+            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+              <Typography sx={{ fontSize: '0.8rem' }}>TDS ({selectedReceipt.tds_rate}%):</Typography>
+              <Typography sx={{ fontSize: '0.85rem', color: '#EF4444' }}>-₹{formatCurrency(selectedReceipt.tds_amount)}</Typography>
+            </Stack>
+          )}
+          <Stack direction="row" justifyContent="space-between">
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700 }}>Net Received:</Typography>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: COLORS.primary }}>₹{formatCurrency(selectedReceipt.net_received)}</Typography>
+          </Stack>
+        </Box>
+      </Stack>
+    ) : (
+      <Typography>No receipt selected</Typography>
+    )}
+  </DialogContent>
+  <DialogActions sx={{ p: 2, borderTop: `1px solid ${COLORS.border}` }}>
+    <Button 
+      onClick={() => { setOpenViewDetailsDialog(false); setSelectedReceipt(null); }} 
+      variant="contained" 
+      sx={{ bgcolor: COLORS.primary }}
+    >
+      Close
+    </Button>
+  </DialogActions>
+</Dialog>
 
       <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled" sx={{ width: '100%', borderRadius: 1.5, fontSize: '0.75rem' }}>{snackbar.message}</Alert>

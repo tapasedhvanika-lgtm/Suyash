@@ -2805,6 +2805,97 @@ const sendInvoice = async (req, res) => {
     return err(res, e.message);
   }
 };
+    // ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/invoices/:id/confirm — Confirm Draft Invoice (Draft → Issued)
+// ─────────────────────────────────────────────────────────────────────────────
+const confirmInvoice = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return err(res, 'Invalid Invoice ID', 400);
+    }
+
+    const invoice = await SalesInvoice.findOne({ 
+      _id: req.params.id, 
+      is_active: true 
+    });
+
+    if (!invoice) {
+      return err(res, 'Invoice not found', 404);
+    }
+
+    if (invoice.status !== 'Draft') {
+      return err(res, `Cannot confirm invoice in status: ${invoice.status}. Only Draft invoices can be confirmed.`, 400);
+    }
+
+    invoice.status = 'Issued';
+    invoice.issued_at = new Date();
+    invoice.issued_by = req.user._id;
+    invoice.updated_by = req.user._id;
+    await invoice.save();
+
+    const result = await SalesInvoice.findById(invoice._id).lean({ virtuals: true });
+
+    return ok(res, {
+      message: `Invoice ${invoice.invoice_no} confirmed successfully`,
+      data: result,
+    });
+
+  } catch (e) {
+    console.error('[confirmInvoice] Error:', e);
+    return err(res, e.message);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/invoices/:id/cancel — Cancel Invoice
+// ─────────────────────────────────────────────────────────────────────────────
+const cancelInvoice = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return err(res, 'Invalid Invoice ID', 400);
+    }
+
+    const { reason } = req.body;
+    if (!reason?.trim()) {
+      return err(res, 'Cancellation reason is required', 400);
+    }
+
+    const invoice = await SalesInvoice.findOne({ 
+      _id: req.params.id, 
+      is_active: true 
+    });
+
+    if (!invoice) {
+      return err(res, 'Invoice not found', 404);
+    }
+
+    if (invoice.status === 'Cancelled') {
+      return err(res, 'Invoice is already cancelled', 400);
+    }
+
+    if (invoice.status === 'Paid' || invoice.payment_status === 'Fully Paid') {
+      return err(res, 'Cannot cancel a fully paid invoice. Please issue a Credit Note instead.', 400);
+    }
+
+    invoice.status = 'Cancelled';
+    invoice.cancelled_at = new Date();
+    invoice.cancelled_by = req.user._id;
+    invoice.cancellation_reason = reason.trim();
+    invoice.updated_by = req.user._id;
+    await invoice.save();
+
+    const result = await SalesInvoice.findById(invoice._id).lean({ virtuals: true });
+
+    return ok(res, {
+      message: `Invoice ${invoice.invoice_no} cancelled successfully`,
+      data: result,
+    });
+
+  } catch (e) {
+    console.error('[cancelInvoice] Error:', e);
+    return err(res, e.message);
+  }
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ██  BE-013  POST /api/payment-receipts  — Create Payment Receipt (NO TRANSACTIONS)
@@ -4008,6 +4099,8 @@ module.exports = {
   submitIRN,
   cancelIRN,
   sendInvoice,
+  confirmInvoice,   
+  cancelInvoice,
 
   // BE-013 — Payments
   createPaymentReceipt,

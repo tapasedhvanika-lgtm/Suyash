@@ -733,7 +733,7 @@ import {
   DialogContent,
   DialogActions,
   TextField as MuiTextField,
- 
+  
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -750,6 +750,9 @@ import {
   PictureAsPdf as PdfIcon,
   Send as SendIcon,
   Email as EmailIcon,
+   CheckCircleOutline as CheckCircleOutlineIcon,  
+  Block as BlockIcon,                             
+  Close as CloseIcon, 
 } from '@mui/icons-material';
 import axios from 'axios';
 import BASE_URL from '../../../config/Config';
@@ -969,10 +972,63 @@ const SendEmailDialog = ({ open, onClose, invoice, onSuccess, permissions, isSup
 };
 
 // Action Menu Component - WITH PERMISSION CHECKS
-const ActionMenu = ({ record, onView, onExportPDF, onSendEmail, anchorEl, onClose, onOpen, permissions, isSuperAdmin }) => {
+// const ActionMenu = ({ record, onView, onExportPDF, onSendEmail, anchorEl, onClose, onOpen, permissions, isSuperAdmin }) => {
+//   const canView = isSuperAdmin || hasPermission(permissions, MODULES.INVOICE_REPORT, PAGES.INVOICE_REPORT, ACTIONS.VIEW);
+//   const canPrint = isSuperAdmin || hasPermission(permissions, MODULES.INVOICE_REPORT, PAGES.INVOICE_REPORT, ACTIONS.PRINT);
+//   const canCreate = isSuperAdmin || hasPermission(permissions, MODULES.INVOICE_REPORT, PAGES.INVOICE_REPORT, ACTIONS.CREATE);
+
+//   return (
+//     <>
+//       <Tooltip title="Actions">
+//         <IconButton size="small" onClick={onOpen} sx={{ color: COLORS.text.secondary, '&:hover': { bgcolor: `${COLORS.primary}20` } }}>
+//           <MoreVertIcon fontSize="small" />
+//         </IconButton>
+//       </Tooltip>
+//       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onClose} PaperProps={{ elevation: 3, sx: { mt: 1, minWidth: 180, borderRadius: 2, border: `1px solid ${COLORS.border}` } }}>
+//         {/* View Details - VIEW permission */}
+//         {canView && (
+//           <MenuItem onClick={() => { onView(record); onClose(); }} sx={{ py: 1.5 }}>
+//             <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><VisibilityIcon fontSize="small" /></ListItemIcon>
+//             <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>View Details</Typography></ListItemText>
+//           </MenuItem>
+//         )}
+        
+//         {/* Export PDF - PRINT permission */}
+//         {canPrint && (
+//           <MenuItem onClick={() => { onExportPDF(record); onClose(); }} sx={{ py: 1.5 }}>
+//             <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><PdfIcon fontSize="small" /></ListItemIcon>
+//             <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>Export PDF</Typography></ListItemText>
+//           </MenuItem>
+//         )}
+        
+//         {/* Send Email - CREATE permission */}
+//         {canCreate && (
+//           <MenuItem onClick={() => { onSendEmail(record); onClose(); }} sx={{ py: 1.5 }}>
+//             <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><SendIcon fontSize="small" /></ListItemIcon>
+//             <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>Send Email</Typography></ListItemText>
+//           </MenuItem>
+//         )}
+//       </Menu>
+//     </>
+//   );
+// };
+
+const ActionMenu = ({ 
+  record, 
+  onView, 
+  onExportPDF, 
+  onSendEmail, 
+  onConfirm,      // ⭐ NAYA
+  anchorEl, 
+  onClose, 
+  onOpen, 
+  permissions, 
+  isSuperAdmin 
+}) => {
   const canView = isSuperAdmin || hasPermission(permissions, MODULES.INVOICE_REPORT, PAGES.INVOICE_REPORT, ACTIONS.VIEW);
   const canPrint = isSuperAdmin || hasPermission(permissions, MODULES.INVOICE_REPORT, PAGES.INVOICE_REPORT, ACTIONS.PRINT);
   const canCreate = isSuperAdmin || hasPermission(permissions, MODULES.INVOICE_REPORT, PAGES.INVOICE_REPORT, ACTIONS.CREATE);
+  const canEdit = isSuperAdmin || hasPermission(permissions, MODULES.INVOICE_REPORT, PAGES.INVOICE_REPORT, ACTIONS.EDIT);  // ⭐ NAYA
 
   return (
     <>
@@ -982,6 +1038,7 @@ const ActionMenu = ({ record, onView, onExportPDF, onSendEmail, anchorEl, onClos
         </IconButton>
       </Tooltip>
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onClose} PaperProps={{ elevation: 3, sx: { mt: 1, minWidth: 180, borderRadius: 2, border: `1px solid ${COLORS.border}` } }}>
+        
         {/* View Details - VIEW permission */}
         {canView && (
           <MenuItem onClick={() => { onView(record); onClose(); }} sx={{ py: 1.5 }}>
@@ -1003,6 +1060,20 @@ const ActionMenu = ({ record, onView, onExportPDF, onSendEmail, anchorEl, onClos
           <MenuItem onClick={() => { onSendEmail(record); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><SendIcon fontSize="small" /></ListItemIcon>
             <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>Send Email</Typography></ListItemText>
+          </MenuItem>
+        )}
+
+        {/* ⭐ CONFIRM INVOICE — Sirf Draft mein dikhega ⭐ */}
+        {canEdit && record.status === 'Draft' && (
+          <MenuItem onClick={() => { onConfirm(record); onClose(); }} sx={{ py: 1.5 }}>
+            <ListItemIcon sx={{ color: '#10B981', minWidth: 36 }}>
+              <CheckCircleOutlineIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              <Typography sx={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 500 }}>
+                Confirm Invoice
+              </Typography>
+            </ListItemText>
           </MenuItem>
         )}
       </Menu>
@@ -1231,6 +1302,34 @@ const InvoiceMaster = () => {
   const handleEmailSent = (email) => {
     showNotification(`Invoice sent successfully to ${email}!`, 'success');
   };
+
+  // ⭐ CONFIRM INVOICE HANDLER
+const handleConfirmInvoice = async (record) => {
+  if (!window.confirm(`Are you sure you want to confirm invoice ${record.invoice_no}?`)) {
+    return;
+  }
+  
+  try {
+    const token = localStorage.getItem('token');
+    
+    const response = await axios.put(
+      `${BASE_URL}/api/invoices/${record._id}/confirm`,
+      {},
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+    
+    if (response.data.success) {
+      showNotification('Invoice confirmed successfully!', 'success');
+      fetchInvoices();
+    } else {
+      showNotification(response.data.message || 'Failed to confirm invoice', 'error');
+    }
+  } catch (err) {
+    console.error('Error confirming invoice:', err);
+    showNotification(err.response?.data?.message || 'Failed to confirm invoice', 'error');
+  }
+};
+
 
   // Handle selection - only if user has delete permission
   const handleSelectAll = (event) => {
@@ -1493,6 +1592,7 @@ const InvoiceMaster = () => {
                           onView={openViewModalHandler} 
                           onExportPDF={handleExportPDF}
                           onSendEmail={handleSendEmail}
+                          onConfirm={handleConfirmInvoice}   
                           anchorEl={isActionMenuOpen ? actionMenuAnchor : null} 
                           onClose={handleActionMenuClose} 
                           onOpen={(e) => handleActionMenuOpen(e, invoice)} 

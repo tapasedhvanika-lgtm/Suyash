@@ -1825,9 +1825,16 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [loadingVendor, setLoadingVendor] = useState(false);
 
+  
+// Sales Order states 
+const [salesOrders, setSalesOrders] = useState([]);
+const [selectedSalesOrder, setSelectedSalesOrder] = useState(null);
+const [loadingSalesOrder, setLoadingSalesOrder] = useState(false);
+
   // Form data
   const [formData, setFormData] = useState({
     vendor_id: '',
+     so_id: '', //Sales Order ID ke liye,  Backend ko DC banane ke liye so_id chahiye hota hai
     nature_of_processing: 'Chamfer',
     ship_to: {
       line1: '',
@@ -1871,12 +1878,34 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
     }
   }, []);
 
+    // Fetch Sales Orders
+const fetchSalesOrders = useCallback(async () => {
+  try {
+    setLoadingSalesOrder(true);
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${BASE_URL}/api/sales-orders`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (response.data.success) {
+      setSalesOrders(response.data.data || []);
+    }
+  } catch (err) {
+    console.error('Error fetching sales orders:', err);
+  } finally {
+    setLoadingSalesOrder(false);
+  }
+}, []);
+
   // Fetch data when dialog opens
   useEffect(() => {
     if (open) {
       fetchVendors();
+      fetchSalesOrders();    
     }
-  }, [open, fetchVendors]);
+  }, [open, fetchVendors, fetchSalesOrders]);
 
   // Handle Vendor selection
   const handleVendorChange = (event, newValue) => {
@@ -1941,6 +1970,17 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
     setFieldErrors({});
     setError('');
   };
+
+    // Handle Sales Order selection
+const handleSalesOrderChange = (event, newValue) => {
+  setSelectedSalesOrder(newValue);
+  setFormData(prev => ({
+    ...prev,
+    so_id: newValue?._id || ''
+  }));
+  setFieldErrors(prev => ({ ...prev, so_id: '' }));
+  setError('');
+};
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -2071,6 +2111,11 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
           errorMessages.push('Vendor is required');
           isValid = false;
         }
+        if (!formData.so_id) {                                    // <-- Naya
+           errors.so_id = 'Sales Order is required';               // <-- Naya
+           errorMessages.push('Sales Order is required');          // <-- Naya
+          isValid = false;                                        // <-- Naya
+  }   
         if (!formData.nature_of_processing) {
           errors.nature_of_processing = 'Nature of Processing is required';
           errorMessages.push('Nature of Processing is required');
@@ -2194,6 +2239,11 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
       errorMessages.push('Vendor is required');
       isValid = false;
     }
+       if (!formData.so_id) {
+    errors.so_id = 'Sales Order is required';
+    errorMessages.push('Sales Order is required');
+    isValid = false;
+  }
     if (!formData.nature_of_processing) {
       errors.nature_of_processing = 'Nature of Processing is required';
       errorMessages.push('Nature of Processing is required');
@@ -2320,6 +2370,8 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
       const token = localStorage.getItem('token');
 
       const requestData = {
+         so_id: formData.so_id, 
+         so_number: selectedSalesOrder?.so_number || '',
         vendor_id: formData.vendor_id,
         nature_of_processing: formData.nature_of_processing,
         ship_to: {
@@ -2378,8 +2430,10 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
   const resetForm = () => {
     setActiveStep(0);
     setSelectedVendor(null);
+    setSelectedSalesOrder(null);
     setFormData({
       vendor_id: '',
+      so_id: '',
       nature_of_processing: 'Chamfer',
       ship_to: {
         line1: '',
@@ -2454,6 +2508,57 @@ const AddDeliveryChallan = ({ open, onClose, onSuccess }) => {
                             endAdornment: (
                               <>
                                 {loadingVendor && <CircularProgress size={16} />}
+                                {params.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                  </Box>
+                </Grid>
+
+                                  {/* Sales Order Dropdown */}
+                <Grid size={{ xs: 12 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.secondary }}>
+                      Select Sales Order <span style={{ color: '#EF4444' }}>*</span>
+                    </Typography>
+                    <Autocomplete
+                      fullWidth
+                      options={salesOrders}
+                      getOptionLabel={(option) => 
+                        `${option.so_number} - ${option.customer_name || option.customer?.customer_name || ''}`
+                      }
+                      loading={loadingSalesOrder}
+                      value={selectedSalesOrder}
+                      onChange={handleSalesOrderChange}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          size="small"
+                          placeholder="Search and select sales order"
+                          error={!!fieldErrors.so_id}
+                          helperText={fieldErrors.so_id}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 1.5,
+                              fontSize: '0.75rem',
+                              '&:hover fieldset': { borderColor: COLORS.primary },
+                              '&.Mui-focused fieldset': { borderColor: COLORS.primary, borderWidth: 1 },
+                              '&.Mui-error fieldset': { borderColor: '#EF4444' }
+                            },
+                            '& .MuiInputBase-input': {
+                              py: 1,
+                              px: 1.5,
+                              fontSize: '0.75rem'
+                            }
+                          }}
+                          InputProps={{
+                            ...params.InputProps,
+                            endAdornment: (
+                              <>
+                                {loadingSalesOrder && <CircularProgress size={16} />}
                                 {params.InputProps.endAdornment}
                               </>
                             ),

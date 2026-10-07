@@ -149,6 +149,7 @@ const AddPaymentReceipt = ({ open, onClose, onSuccess }) => {
       setLoadingCustomers(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`${BASE_URL}/api/customers?limit=200`, {
+       
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -168,7 +169,8 @@ const AddPaymentReceipt = ({ open, onClose, onSuccess }) => {
     try {
       setLoadingInvoices(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${BASE_URL}/api/invoices?limit=200`, {
+     // const response = await axios.get(`${BASE_URL}/api/invoices?limit=200`, {
+     const response = await axios.get(`${BASE_URL}/api/invoices?limit=500`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -201,9 +203,13 @@ const AddPaymentReceipt = ({ open, onClose, onSuccess }) => {
   useEffect(() => {
     if (selectedCustomer && invoices.length > 0) {
       // Filter invoices for selected customer that have balance due > 0
+      // const customerInvoices = invoices.filter(invoice => 
+      //   invoice.customer_id === selectedCustomer._id && 
+      //   (invoice.balance_due || invoice.grand_total) > 0
+      // );
       const customerInvoices = invoices.filter(invoice => 
-        invoice.customer_id === selectedCustomer._id && 
-        (invoice.balance_due || invoice.grand_total) > 0
+      String(invoice.customer_id) === String(selectedCustomer._id) && 
+     (invoice.balance_due || invoice.grand_total) > 0
       );
       setAvailableInvoices(customerInvoices);
     } else {
