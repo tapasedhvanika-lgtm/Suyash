@@ -1246,3 +1246,62 @@ exports.closeRFQ = async (req, res) => {
     });
   }
 };
+  
+
+
+// ======================================================
+// BULK DELETE RFQs
+// POST /api/rfqs/bulk-delete
+// ======================================================
+
+exports.bulkDeleteRFQs = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide RFQ IDs'
+      });
+    }
+
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const id of ids) {
+      const rfq = await RFQ.findById(id);
+
+      if (!rfq) {
+        errors.push(`RFQ ${id} not found`);
+        continue;
+      }
+
+      if (rfq.status === 'Closed') {
+        errors.push(
+          `RFQ ${rfq.rfq_number} is already closed`
+        );
+        continue;
+      }
+
+      await RFQ.findByIdAndDelete(id);
+
+      deletedCount++;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${deletedCount} RFQ(s) deleted successfully`,
+      deletedCount,
+      errors
+    });
+
+  } catch (error) {
+    console.error('Bulk delete RFQs error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};

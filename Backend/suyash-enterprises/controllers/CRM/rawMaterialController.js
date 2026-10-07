@@ -8,7 +8,7 @@ const getRawMaterials = async (req, res) => {
   try {
     const { page = 1, limit = 10, materialName, grade, isActive } = req.query;
     
-    const query = {};
+    const query = { IsActive: true };
     if (isActive !== undefined) query.IsActive = isActive === 'true';
     if (materialName) query.MaterialName = new RegExp(materialName, 'i');
     if (grade) query.Grade = new RegExp(grade, 'i');
@@ -363,6 +363,44 @@ const bulkCreateRawMaterials = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+// @desc    Bulk delete raw materials (soft delete)
+// @route   POST /api/raw-materials/bulk-delete
+// @access  Private
+const bulkDeleteRawMaterials = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide raw material IDs'
+      });
+    }
+
+    const result = await RawMaterial.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          IsActive: false,
+          UpdatedBy: req.user._id
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} raw material(s) deactivated successfully`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error('Bulk delete raw materials error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
 
 module.exports = {
   getRawMaterials,
@@ -371,6 +409,7 @@ module.exports = {
   createRawMaterial,
   updateRawMaterial,
   deleteRawMaterial,
+  bulkDeleteRawMaterials,
   getRawMaterialsDropdown,
   bulkCreateRawMaterials,
   getRateByMaterialId

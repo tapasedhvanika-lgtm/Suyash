@@ -7,6 +7,7 @@ const {
   createRawMaterial,
   updateRawMaterial,
   deleteRawMaterial,
+  bulkDeleteRawMaterials,
   getRawMaterialsDropdown,
   bulkCreateRawMaterials,
   getRateByMaterialId
@@ -723,5 +724,6 @@ router.put('/:id', updateRawMaterial);
  *         description: Server error
  */
 router.delete('/:id', deleteRawMaterial);
+router.post('/bulk-delete', bulkDeleteRawMaterials);
 
 module.exports = router;

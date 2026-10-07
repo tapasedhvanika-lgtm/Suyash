@@ -60,7 +60,7 @@ const getItems = async (req, res) => {
       material,
     } = req.query;
 
-    const query = {};
+    const query = { is_active: true };
 
     if (is_active !== undefined) query.is_active = is_active === 'true';
     if (item_category)   query.item_category   = item_category;
@@ -512,7 +512,93 @@ const deleteItem = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+// @desc    Bulk deactivate items (soft delete)
+// @route   POST /api/items/bulk-delete
+// @access  Private
+const bulkDeleteItems = async (req, res) => {
+  try {
+    const { ids } = req.body;
 
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide item IDs'
+      });
+    }
+
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const id of ids) {
+      const item = await Item.findById(id);
+
+      if (!item) {
+        errors.push(`Item ${id} not found`);
+        continue;
+      }
+
+      if (!item.is_active) {
+        errors.push(
+          `Item ${item.part_no || item.part_name || id} is already inactive`
+        );
+        continue;
+      }
+
+      let woCount = 0;
+      let soCount = 0;
+
+      try {
+        const WorkOrder = require('../../models/WO/WorkOrder');
+
+        woCount = await WorkOrder.countDocuments({
+          item_id: item._id,
+          status: { $nin: ['Completed', 'Cancelled'] }
+        });
+      } catch {
+        // WO module not available
+      }
+
+      try {
+        const SalesOrder = require('../../models/Sales/SalesOrder');
+
+        soCount = await SalesOrder.countDocuments({
+          'line_items.item_id': item._id,
+          status: { $nin: ['Completed', 'Cancelled'] }
+        });
+      } catch {
+        // SO module not available
+      }
+
+      if (woCount > 0 || soCount > 0) {
+        errors.push(
+          `Cannot deactivate ${item.part_no || item.part_name || id} — ${woCount} open Work Order(s) and ${soCount} open Sales Order(s) still reference this item`
+        );
+        continue;
+      }
+
+      item.is_active = false;
+      item.updated_by = req.user._id;
+
+      await item.save();
+
+      deletedCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `${deletedCount} item(s) deleted successfully`,
+      deletedCount,
+      errors
+    });
+  } catch (error) {
+    console.error('Bulk delete items error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // @desc    Upload drawing revision (multipart/form-data)
 // @route   POST /api/items/:id/drawing
@@ -852,6 +938,7 @@ module.exports = {
   createItem,
   updateItem,
   deleteItem,
+  bulkDeleteItems,
   uploadDrawing,
   whereUsed,
   reorderAlerts,
