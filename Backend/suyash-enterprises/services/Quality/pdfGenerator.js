@@ -93,7 +93,7 @@ async function generateQualityCertificate(certificateData, inspectionData, compa
 
           const readings = (v.readings || v.actual_readings || []);
           const measured  = readings.length
-            ? readings.map(r => Number(r.toFixed(3)).toString()).join(', ')
+           ? readings.map(r => r != null ? Number(r).toFixed(3) : 'N/A').join(', ')
             : (v.average_reading != null ? String(v.average_reading) : 'N/A');
 
           return [

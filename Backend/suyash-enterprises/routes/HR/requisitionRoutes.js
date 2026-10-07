@@ -10,7 +10,8 @@ const {
   updateRequisition,
   addComment,
   getRequisitionStats,
-  deleteRequisition
+  deleteRequisition,
+  bulkDeleteRequisitions // ✅ Added
 } = require('../../controllers/HR/requisitionController');
 const { protect } = require('../../middleware/authMiddleware');
 const { validate, requisitionValidation, validateId } = require('../../middleware/validationMiddleware');
@@ -19,7 +20,10 @@ const { validate, requisitionValidation, validateId } = require('../../middlewar
 router.use(protect);
 
 // Statistics route
-router.get('/stats/dashboard',  getRequisitionStats);
+router.get('/stats/dashboard', getRequisitionStats);
+
+// ✅ NEW: Bulk delete route — MUST come BEFORE /:id routes
+router.delete('/bulk', bulkDeleteRequisitions);
 
 // Main routes
 router.route('/')
@@ -34,8 +38,8 @@ router.route('/:id')
 
 // Action routes
 router.put('/:id/submit', validate(validateId), submitRequisition);
-router.post('/:id/approve', validate(validateId),  approveRequisition);
-router.post('/:id/reject', validate(validateId),  rejectRequisition);
+router.post('/:id/approve', validate(validateId), approveRequisition);
+router.post('/:id/reject', validate(validateId), rejectRequisition);
 router.post('/:id/comments', validate(validateId), addComment);
 
 module.exports = router;

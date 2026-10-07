@@ -31,7 +31,6 @@ const scheduleInterview = async (req, res) => {
       meetingLink
     } = req.body;
 
-    // Validate required fields
     if (!applicationId || !round || !interviewers || !scheduledAt || !type) {
       return res.status(400).json({
         success: false,
@@ -46,7 +45,6 @@ const scheduleInterview = async (req, res) => {
       });
     }
 
-    // Get application with details
     const application = await Application.findById(applicationId)
       .populate('candidateId')
       .populate('jobId');
@@ -58,7 +56,6 @@ const scheduleInterview = async (req, res) => {
       });
     }
 
-    // IMPORTANT: Check if application status is 'shortlisted'
     if (application.status !== 'shortlisted') {
       return res.status(400).json({
         success: false,
@@ -66,7 +63,6 @@ const scheduleInterview = async (req, res) => {
       });
     }
 
-    // Check interviewer availability via Google Calendar
     const interviewerIds = interviewers.map(i => i.interviewerId);
     const interviewersList = await User.find({ _id: { $in: interviewerIds } })
       .populate('EmployeeID');
@@ -85,10 +81,8 @@ const scheduleInterview = async (req, res) => {
       });
     }
 
-    // Generate interview ID
     const interviewId = await generateInterviewId();
 
-    // Create interview
     const interviewData = {
       interviewId,
       applicationId: application._id,
@@ -113,14 +107,12 @@ const scheduleInterview = async (req, res) => {
 
     const interview = await Interview.create(interviewData);
 
-    // Create calendar events
     const calendarEvents = await calendarService.createInterviewEvents(interview, application);
     interview.calendarEvents = calendarEvents;
     await interview.save();
 
-    // Update application - change status to 'interview_scheduled'
     application.interviews.push(interview._id);
-    application.status = 'interview_scheduled'; // Update to interview_scheduled
+    application.status = 'interview_scheduled';
     application.statusHistory.push({
       status: 'interview_scheduled',
       changedBy: req.user._id,
@@ -130,18 +122,14 @@ const scheduleInterview = async (req, res) => {
     });
     await application.save();
 
-    // Optionally update candidate status
     const candidate = await Candidate.findById(application.candidateId._id);
     if (candidate && candidate.status === 'shortlisted') {
       candidate.status = 'interviewed';
       await candidate.save();
     }
 
-    // Send email notifications
     await emailService.sendInterviewInvitation(interview, application);
 
-    // Send in-app notifications
-    // To candidate (if user exists)
     const candidateUser = await User.findOne({ Email: application.candidateId.email });
     if (candidateUser) {
       await notificationService.createNotification({
@@ -160,7 +148,6 @@ const scheduleInterview = async (req, res) => {
       });
     }
 
-    // To interviewers
     for (const interviewer of interviewers) {
       await notificationService.createNotification({
         userId: interviewer.interviewerId,
@@ -178,7 +165,6 @@ const scheduleInterview = async (req, res) => {
       });
     }
 
-    // Log audit
     await auditService.log(
       'SCHEDULE',
       'Interview',
@@ -269,11 +255,8 @@ const rescheduleInterview = async (req, res) => {
     interview.status = 'rescheduled';
     await interview.save();
 
-    // Update calendar events
     await calendarService.updateInterviewEvents(interview, previousTime);
 
-    // Send notifications
-    // To candidate
     const candidateUser = await User.findOne({ Email: interview.applicationId.candidateId.email });
     if (candidateUser) {
       await notificationService.createNotification({
@@ -290,7 +273,6 @@ const rescheduleInterview = async (req, res) => {
       });
     }
 
-    // To interviewers
     for (const interviewer of interview.interviewers) {
       await notificationService.createNotification({
         userId: interviewer.interviewerId,
@@ -306,7 +288,6 @@ const rescheduleInterview = async (req, res) => {
       });
     }
 
-    // Send emails
     await emailService.sendInterviewReschedule(interview, reason);
 
     res.json({
@@ -365,12 +346,10 @@ const cancelInterview = async (req, res) => {
     interview.status = 'cancelled';
     await interview.save();
 
-    // Delete calendar events
     await calendarService.deleteInterviewEvents(interview);
 
-    // Update application
     const application = interview.applicationId;
-    application.status = 'shortlisted'; // Revert to shortlisted
+    application.status = 'shortlisted';
     application.statusHistory.push({
       status: 'shortlisted',
       changedBy: req.user._id,
@@ -380,7 +359,6 @@ const cancelInterview = async (req, res) => {
     });
     await application.save();
 
-    // Send notifications
     const candidateUser = await User.findOne({ Email: application.candidateId.email });
     if (candidateUser) {
       await notificationService.createNotification({
@@ -396,7 +374,6 @@ const cancelInterview = async (req, res) => {
       });
     }
 
-    // Send emails
     await emailService.sendInterviewCancellation(interview, reason);
 
     res.json({
@@ -444,7 +421,6 @@ const submitFeedback = async (req, res) => {
       });
     }
 
-    // Check if user is an interviewer
     const isInterviewer = interview.interviewers.some(
       i => i.interviewerId.toString() === req.user._id.toString()
     );
@@ -463,7 +439,6 @@ const submitFeedback = async (req, res) => {
       });
     }
 
-    // Calculate overall rating if not provided
     let overallRating = ratings?.overall;
     if (!overallRating && ratings) {
       const ratingValues = Object.values(ratings).filter(r => typeof r === 'number');
@@ -491,14 +466,13 @@ const submitFeedback = async (req, res) => {
     interview.status = 'completed';
     await interview.save();
 
-    // Update application status based on decision
     const application = interview.applicationId;
     if (decision === 'select') {
       application.status = 'selected'; 
     } else if (decision === 'reject') {
       application.status = 'rejected';
     } else if (decision === 'hold') {
-      application.status = 'onHold'; // or 'hold' based on your enum
+      application.status = 'onHold';
     } else {
       application.status = 'interviewed'; 
     }
@@ -512,7 +486,6 @@ const submitFeedback = async (req, res) => {
     });
     await application.save();
 
-    // Update candidate status
     const candidate = await Candidate.findById(interview.candidateId);
     if (candidate) {
       if (decision === 'select') {
@@ -520,14 +493,13 @@ const submitFeedback = async (req, res) => {
       } else if (decision === 'reject') {
         candidate.status = 'rejected';
       } else if (decision === 'hold') {
-        candidate.status = 'onHold'; // Set candidate status to onhold
+        candidate.status = 'onHold';
       } else {
-        candidate.status = 'interviewed'; // For other cases
+        candidate.status = 'interviewed';
       }
       await candidate.save();
     }
 
-    // Notify HR
     const hrUsers = await User.find()
       .populate({
         path: 'RoleID',
@@ -553,7 +525,6 @@ const submitFeedback = async (req, res) => {
       }
     }
 
-    // Log audit
     await auditService.log(
       'FEEDBACK',
       'Interview',
@@ -604,11 +575,9 @@ const getInterviews = async (req, res) => {
       if (toDate) filter.scheduledAt.$lte = new Date(toDate);
     }
 
-    // Filter by interviewer
     if (interviewerId) {
       filter['interviewers.interviewerId'] = mongoose.Types.ObjectId(interviewerId);
     } else if (req.user.RoleName !== 'SuperAdmin' && req.user.RoleName !== 'CEO' && req.user.RoleName !== 'HR') {
-      // Non-admin users see only interviews they're part of
       filter['interviewers.interviewerId'] = req.user._id;
     }
 
@@ -702,11 +671,89 @@ const getInterviewById = async (req, res) => {
   }
 };
 
+// ✅ NEW: @desc    Bulk delete interviews
+// @route   DELETE /api/interviews/bulk
+// @access  Private (HR/SuperAdmin)
+const bulkDeleteInterviews = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No interviews selected for deletion'
+      });
+    }
+
+    const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid interview IDs provided'
+      });
+    }
+
+    // Find all interviews for audit logging
+    const interviews = await Interview.find({ _id: { $in: validIds } });
+
+    if (interviews.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No interviews found with the given IDs'
+      });
+    }
+
+    // Delete interviews
+    const result = await Interview.deleteMany({ _id: { $in: validIds } });
+
+    // Remove interview references from applications
+    await Application.updateMany(
+      { interviews: { $in: validIds } },
+      { $pull: { interviews: { $in: validIds } } }
+    );
+
+    // Log audit for each
+    for (const interview of interviews) {
+      try {
+        await auditService.log(
+          'DELETE',
+          'Interview',
+          interview._id,
+          req.user,
+          {
+            interviewId: interview.interviewId,
+            candidateId: interview.candidateId,
+            action: 'bulk_delete'
+          },
+          req
+        );
+      } catch (auditErr) {
+        console.warn('Audit log failed for', interview._id, auditErr.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} interview(s) deleted successfully`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete interviews error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+};
+
 module.exports = {
   scheduleInterview,
   rescheduleInterview,
   cancelInterview,
   submitFeedback,
   getInterviews,
-  getInterviewById
+  getInterviewById,
+  bulkDeleteInterviews // ✅ Added
 };

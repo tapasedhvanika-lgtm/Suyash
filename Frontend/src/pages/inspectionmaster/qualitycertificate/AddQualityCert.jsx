@@ -175,10 +175,9 @@ const AddQualityCert = ({ open, onClose, onCertificateGenerated }) => {
 // Fetch Work Orders - Get only completed ones
 try {
   // Add status filter to API query
-  woRes = await axios.get(`${BASE_URL}/api/work-orders?status=Completed`, { 
-    headers: { Authorization: `Bearer ${token}` } 
-  });
-  
+ woRes = await axios.get(`${BASE_URL}/api/work-orders`, {
+  headers: { Authorization: `Bearer ${token}` }
+ });
   if (woRes.data.success) {
     const allWOs = woRes.data.data || [];
     // Additional filter to ensure only completed work orders

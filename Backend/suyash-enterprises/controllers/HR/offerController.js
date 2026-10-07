@@ -14,18 +14,32 @@ const auditService = require('../../services/auditService');
 const cloudStorage = require('../../services/cloudStorageService');
 const mongoose = require('mongoose');
 
-// In offerController.js, add this helper function at the top
+// ✅ CRITICAL FIX: Added missing imports for path and fs used in approveOffer
+const path = require('path');
+const fs = require('fs');
+
+// Generate Offer ID helper
 const generateOfferId = async () => {
   const Offer = require('../../models/HR/Offer');
   const year = new Date().getFullYear();
-  const count = await Offer.countDocuments({
-    offerId: new RegExp(`OFF-${year}-`, 'i')
-  });
-  return `OFF-${year}-${(count + 1).toString().padStart(5, '0')}`;
+  
+  // Find the highest offer ID for the current year
+  const lastOffer = await Offer.findOne({
+    offerId: new RegExp(`^OFF-${year}-`, 'i')
+  }).sort({ offerId: -1 }).lean();
+
+  let nextSeq = 1;
+  if (lastOffer && lastOffer.offerId) {
+    const parts = lastOffer.offerId.split('-');
+    nextSeq = parseInt(parts[2], 10) + 1;
+  }
+
+  return `OFF-${year}-${String(nextSeq).padStart(5, '0')}`;
 };
 
-// Then update your initiateOffer function:
-
+// @desc    Initiate offer
+// @route   POST /api/offers/initiate
+// @access  Private (HR only)
 const initiateOffer = async (req, res) => {
   try {
     const {
@@ -399,6 +413,12 @@ const rejectOffer = async (req, res) => {
       }
     );
 
+    // Explicitly set status to rejected if workflow doesn't do it
+    if (offer.status !== 'rejected') {
+      offer.status = 'rejected';
+      await offer.save();
+    }
+
     // Log audit
     await auditService.log(
       'REJECT',
@@ -476,7 +496,6 @@ const generateOfferLetter = async (req, res) => {
     const job = await JobOpening.findById(offer.jobId);
 
     // Instead of generating PDF, return HTML or a message
-    // Option 1: Return HTML that can be viewed in browser
     const html = `
       <!DOCTYPE html>
       <html>
@@ -562,7 +581,6 @@ const generateOfferLetter = async (req, res) => {
   } catch (error) {
     console.error('Generate offer letter error:', error);
     
-    // Return a user-friendly error response
     res.status(500).json({
       success: false,
       message: 'PDF generation is currently unavailable due to server configuration. Please use the view offer endpoint instead.',
@@ -577,7 +595,7 @@ const generateOfferLetter = async (req, res) => {
 const sendOfferLetter = async (req, res) => {
   try {
     const { id } = req.params;
-    const { emailOverride } = req.body; // Optional: send to different email than candidate's
+    const { emailOverride } = req.body; 
 
     // Validate offer ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -608,8 +626,8 @@ const sendOfferLetter = async (req, res) => {
       });
     }
 
-    // Check if already sent
-    if (offer.sentToCandidate && offer.sentToCandidate.sentAt) {
+    // ✅ FIXED: Check if already successfully sent (emailSent must be true)
+    if (offer.sentToCandidate && offer.sentToCandidate.emailSent) {
       return res.status(400).json({
         success: false,
         message: 'Offer has already been sent to candidate',
@@ -644,13 +662,6 @@ const sendOfferLetter = async (req, res) => {
       sentAt: new Date()
     };
 
-    // Create sent tracking
-    offer.sentToCandidate = {
-      sentAt: new Date(),
-      email: candidateEmail,
-      method: 'email'
-    };
-
     // Generate view offer URL
     const baseUrl = process.env.BASE_URL || 'http://localhost:5009';
     const viewOfferUrl = `${baseUrl}/api/offers/${offer._id}/html?token=${accessToken}`;
@@ -671,15 +682,13 @@ const sendOfferLetter = async (req, res) => {
     const offerLetter = offer.documents?.find(d => d.type === 'offer_letter');
     
     let emailSent = false;
-    let emailError = null;
+    let emailErrorMsg = null;
 
     // Try to send email with appropriate method
     try {
       if (offerLetter && offerLetter.fileUrl) {
-        // Send email with PDF attachment
         console.log('📧 Sending offer letter with PDF attachment to:', candidateEmail);
         
-        // Check if email service has sendOfferLetter method
         if (typeof emailService.sendOfferLetter === 'function') {
           await emailService.sendOfferLetter(
             offer, 
@@ -687,34 +696,31 @@ const sendOfferLetter = async (req, res) => {
             offerLetter.fileUrl, 
             accessToken,
             viewOfferUrl,
-            candidateEmail // override email if provided
+            candidateEmail 
           );
           emailSent = true;
         } else {
           throw new Error('emailService.sendOfferLetter is not a function');
         }
       } else {
-        // Send email without PDF, with link to view online
         console.log('📧 No PDF found, sending HTML email with view link to:', candidateEmail);
         
-        // Check if email service has sendSimpleOfferEmail method
         if (typeof emailService.sendSimpleOfferEmail === 'function') {
           await emailService.sendSimpleOfferEmail(
             offer, 
             candidate, 
             viewOfferUrl,
             acceptOfferUrl,
-            candidateEmail // override email if provided
+            candidateEmail 
           );
           emailSent = true;
         } 
-        // Fallback to sendOfferLetter if sendSimpleOfferEmail doesn't exist
         else if (typeof emailService.sendOfferLetter === 'function') {
           console.log('⚠️ sendSimpleOfferEmail not found, falling back to sendOfferLetter');
           await emailService.sendOfferLetter(
             offer, 
             candidate, 
-            null, // no PDF
+            null, 
             accessToken,
             viewOfferUrl,
             candidateEmail
@@ -725,26 +731,32 @@ const sendOfferLetter = async (req, res) => {
         }
       }
       
-      // Update offer with sent status
-      offer.sentToCandidate.emailSent = true;
-      offer.sentToCandidate.emailSentAt = new Date();
-      
-      // KEY CHANGE: Update offer status to 'sent' when email is successfully sent
+      // ✅ FIXED: Only set sent status when email is successfully sent
       if (emailSent) {
         offer.status = 'sent';
+        offer.sentToCandidate = {
+          sentAt: new Date(),
+          email: candidateEmail,
+          method: 'email',
+          emailSent: true,
+          emailSentAt: new Date()
+        };
         console.log(`✅ Offer status updated to 'sent' for offer: ${offer.offerId}`);
       }
       
-    } catch (emailError) {
-      console.error('❌ Failed to send email:', emailError);
-      emailError = emailError.message;
+    } catch (err) { // ✅ FIXED: Changed from 'emailError' to 'err' to avoid shadowing
+      console.error('❌ Failed to send email:', err);
+      emailErrorMsg = err.message;
       
-      // Still save the token even if email fails
+      // Save that we attempted to send, but it failed
+      offer.sentToCandidate = {
+        email: candidateEmail,
+        method: 'email',
+        emailSent: false
+      };
+      
       responseData.warning = 'Token generated but email sending failed. Token can be shared manually.';
-      responseData.emailError = emailError;
-      
-      //  IMPORTANT: Don't change status to 'sent' if email failed
-      // Status remains 'approved'
+      responseData.emailError = emailErrorMsg;
     }
 
     // Save offer with all updates
@@ -761,7 +773,7 @@ const sendOfferLetter = async (req, res) => {
         hasPDF: !!offerLetter,
         emailSent,
         tokenGenerated: true,
-        newStatus: emailSent ? 'sent' : 'approved' // Log the new status
+        newStatus: emailSent ? 'sent' : 'approved'
       },
       req
     );
@@ -789,7 +801,6 @@ const sendOfferLetter = async (req, res) => {
       message,
       data: {
         ...responseData,
-        //  Include the new status in response
         status: offer.status
       }
     });
@@ -797,7 +808,6 @@ const sendOfferLetter = async (req, res) => {
   } catch (error) {
     console.error('Send offer letter error:', error);
     
-    // Handle specific error types
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         success: false,
@@ -819,6 +829,7 @@ const sendOfferLetter = async (req, res) => {
     });
   }
 };
+
 // @desc    View offer (public with token)
 // @route   GET /api/offers/view/:token
 // @access  Public (with token)
@@ -888,6 +899,8 @@ const acceptOffer = async (req, res) => {
   try {
     const { id } = req.params;
     const { signature, signatureType } = req.body;
+    // ✅ FIXED: Read token from query or body
+    const token = req.query.token || req.body.token;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -907,7 +920,27 @@ const acceptOffer = async (req, res) => {
       });
     }
 
+    // ✅ FIXED: Validate token if one is set on the offer
+    if (offer.acceptance?.token && offer.acceptance.token !== token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or missing token for this offer'
+      });
+    }
 
+    if (offer.acceptance?.tokenExpiry && offer.acceptance.tokenExpiry < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Acceptance token has expired'
+      });
+    }
+
+    if (!['sent', 'approved'].includes(offer.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Offer cannot be accepted in its current status: ${offer.status}`
+      });
+    }
 
     if (offer.expiryDate && offer.expiryDate < new Date()) {
       return res.status(400).json({
@@ -992,7 +1025,6 @@ const acceptOffer = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Get all offers with filters
 // @route   GET /api/offers
@@ -1086,28 +1118,27 @@ const getOffers = async (req, res) => {
     // Get total count for pagination
     const totalOffers = await Offer.countDocuments(filter);
 
-   // Get status counts from database
-      const statusCounts = await Offer.aggregate([
-        {
-          $group: {
-            _id: '$status',
-            count: { $sum: 1 }
-          }
+    // Get status counts from database
+    const statusCounts = await Offer.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
         }
-      ]);
+      }
+    ]);
 
-      // Initialize all statuses from enum with 0 count
-      //  Make sure 'sent' is included here
-      const allStatuses = ['initiated', 'pending_approval', 'sent', 'approved', 'rejected', 'accepted', 'declined', 'expired', 'draft'];
-      const counts = {};
-      allStatuses.forEach(status => {
-        counts[status] = 0;
-      });
+    // Initialize all statuses from enum with 0 count
+    const allStatuses = ['initiated', 'pending_approval', 'sent', 'approved', 'rejected', 'accepted', 'declined', 'expired', 'draft'];
+    const counts = {};
+    allStatuses.forEach(status => {
+      counts[status] = 0;
+    });
 
-      // Update with actual counts
-      statusCounts.forEach(item => {
-        counts[item._id] = item.count;
-      });
+    // Update with actual counts
+    statusCounts.forEach(item => {
+      counts[item._id] = item.count;
+    });
     
     // Calculate pagination info
     const totalPages = Math.ceil(totalOffers / limitNum);
@@ -1207,7 +1238,6 @@ const getOffers = async (req, res) => {
   }
 };
 
-
 // @desc    View offer as HTML (fallback when PDF fails)
 // @route   GET /api/offers/:id/html
 // @access  Public (with token)
@@ -1227,6 +1257,11 @@ const viewOfferHTML = async (req, res) => {
     // Verify token
     if (offer.acceptance?.token !== token) {
       return res.status(401).send('Invalid token');
+    }
+
+    // ✅ Added token expiry check
+    if (offer.acceptance?.tokenExpiry && offer.acceptance.tokenExpiry < new Date()) {
+      return res.status(400).send('Token has expired');
     }
 
     const candidate = offer.candidateId;
@@ -1314,7 +1349,6 @@ const viewOfferHTML = async (req, res) => {
     res.status(500).send('Server error');
   }
 };
-
 
 // @desc    Get approved offers for a candidate
 // @route   GET /api/offers/candidate/:candidateId/approved
@@ -1460,6 +1494,36 @@ const getCandidateApprovedOffers = async (req, res) => {
   }
 };
 
+// @desc    Bulk delete offers
+// @route   DELETE /api/offers/bulk
+// @access  HR/Admin only
+const bulkDeleteOffers = async (req, res) => { // ✅ FIXED: Changed from exports.bulkDeleteOffers to const
+  try {
+    const { offerIds } = req.body;
+
+    if (!offerIds || offerIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No offers selected for deletion'
+      });
+    }
+
+    const result = await Offer.deleteMany({ _id: { $in: offerIds } });
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} offer(s) deleted successfully`
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete offer error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+};
+
 module.exports = {
   initiateOffer,
   submitForApproval,
@@ -1469,8 +1533,8 @@ module.exports = {
   sendOfferLetter,
   viewOffer,
   acceptOffer,
-  viewOfferHTML,  // Add this line
+  viewOfferHTML,
   getCandidateApprovedOffers,
-  getOffers
-
+  getOffers,
+  bulkDeleteOffers // ✅ FIXED: Added to exports
 };

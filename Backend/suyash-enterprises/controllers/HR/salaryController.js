@@ -726,6 +726,86 @@ async updateSalary(req, res) {
       });
     }
   }
+
+  /**
+   * ✅ NEW: Bulk delete salary records
+   * DELETE /api/salaries/bulk
+   * Only PENDING salaries can be deleted
+   */
+  async bulkDeleteSalaries(req, res) {
+    try {
+      const { salaryIds } = req.body;
+
+      if (!salaryIds || !Array.isArray(salaryIds) || salaryIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No salary records selected for deletion'
+        });
+      }
+
+      const validIds = salaryIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+      if (validIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No valid salary IDs provided'
+        });
+      }
+
+      const salaries = await Salary.find({ _id: { $in: validIds } });
+
+      if (salaries.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No salary records found'
+        });
+      }
+
+      const blocked = [];
+      const deletable = [];
+
+      salaries.forEach(salary => {
+        if (salary.isLocked) {
+          blocked.push({ id: salary._id, reason: 'Salary record is locked' });
+        } else if (salary.paymentStatus === 'PAID') {
+          blocked.push({ id: salary._id, reason: 'Cannot delete paid salary record' });
+        } else if (salary.paymentStatus === 'APPROVED') {
+          blocked.push({ id: salary._id, reason: 'Cannot delete approved salary record' });
+        } else {
+          deletable.push(salary._id);
+        }
+      });
+
+      let deletedCount = 0;
+      if (deletable.length > 0) {
+        const result = await Salary.deleteMany({ _id: { $in: deletable } });
+        deletedCount = result.deletedCount;
+      }
+
+      if (deletedCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No salary records could be deleted. Only pending salaries can be deleted.',
+          blocked
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: `${deletedCount} salary record(s) deleted successfully`,
+        deletedCount,
+        blockedCount: blocked.length,
+        blocked: blocked.length > 0 ? blocked : undefined
+      });
+    } catch (error) {
+      console.error('Bulk delete salary error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
+      });
+    }
+  }
   
   /**
    * Bulk manual payroll entry

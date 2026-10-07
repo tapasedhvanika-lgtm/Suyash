@@ -126,10 +126,6 @@ const { protect } = require('../../middleware/authMiddleware');
 router.post('/record', ProductionController.recordProduction);
 
 /**
- * Get all pending productions
- * Access: Supervisor, Manager, Admin only
- */
-/**
  * @swagger
  * /api/production/pending:
  *   get:
@@ -247,51 +243,62 @@ router.post('/record', ProductionController.recordProduction);
  *                                 type: string
  *       401:
  *         description: Unauthorized - Invalid or missing token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Not authorized, no token"
  *       403:
  *         description: Forbidden - Insufficient permissions
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Not authorized to access this resource"
  *       500:
  *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Internal server error"
- *                 error:
- *                   type: string
- *                   example: "Error message details"
  */
 router.get(
   '/pending',
   ProductionController.getPendingProductions
 );
+
+/**
+ * @swagger
+ * /api/production/bulk:
+ *   delete:
+ *     summary: Bulk delete production records
+ *     tags: [Production]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productionIds
+ *             properties:
+ *               productionIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ["60d21b4667d0d8992e610c85", "60d21b4667d0d8992e610c86"]
+ *                 description: Array of production record IDs to delete
+ *     responses:
+ *       200:
+ *         description: Production records deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "2 production record(s) deleted successfully"
+ *       400:
+ *         description: No production records selected for deletion
+ *       500:
+ *         description: Server error
+ *
+ * ⚠️ IMPORTANT: This route MUST come before /:id routes
+ *    Otherwise, Express will treat "bulk" as an ID.
+ */
+router.delete('/bulk', ProductionController.bulkDeleteProduction);
 
 /**
  * @swagger

@@ -1348,7 +1348,7 @@ const PieceRateMaster = () => {
     setSelected([]);
   };
   
-  // Handle bulk delete confirmation
+  // ✅ UPDATED: Handle bulk delete confirmation - uses new /bulk endpoint
   const handleBulkDeleteConfirm = async () => {
     if (!canDelete && !isSuperAdmin) {
       showNotification('You do not have permission to delete piece rates', 'error');
@@ -1363,18 +1363,38 @@ const PieceRateMaster = () => {
 
       const token = localStorage.getItem('token');
 
-      await Promise.all(
-        selected.map((id) =>
-          axios.delete(`${BASE_URL}/api/piece-rate-master/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        )
-      );
+      // ✅ Call the new bulk delete endpoint with { ids: [...] }
+      const response = await axios.delete(`${BASE_URL}/api/piece-rate-master/bulk`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { ids: selected } // DELETE request body
+      });
 
-      setOpenBulkDeleteDialog(false);
-      setSelected([]);
-      fetchPieceRates();
-      showNotification('Selected piece rates deleted successfully', 'success');
+      if (response.data.success) {
+        const { deletedCount = 0, deactivatedCount = 0 } = response.data;
+
+        setOpenBulkDeleteDialog(false);
+        setSelected([]);
+
+        // Build user-friendly message
+        let message = '';
+        if (deletedCount > 0 && deactivatedCount > 0) {
+          message = `${deletedCount} piece rate(s) deleted, ${deactivatedCount} deactivated (in use)`;
+        } else if (deletedCount > 0) {
+          message = `${deletedCount} piece rate(s) deleted successfully`;
+        } else if (deactivatedCount > 0) {
+          message = `${deactivatedCount} piece rate(s) deactivated (in use in production)`;
+        } else {
+          message = response.data.message || 'Operation completed';
+        }
+
+        showNotification(message, 'success');
+        fetchPieceRates();
+      } else {
+        setBulkDeleteError(response.data.message || 'Failed to delete selected piece rates');
+      }
     } catch (error) {
       console.error('Bulk delete error:', error);
       setBulkDeleteError(

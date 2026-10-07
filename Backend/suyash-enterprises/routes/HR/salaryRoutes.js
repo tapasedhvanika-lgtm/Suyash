@@ -19,6 +19,11 @@ router.post('/bulk-manual', salaryController.bulkManualPayroll);
 router.get('/search', salaryController.searchSalaries);
 router.get('/summary', salaryController.getPayrollSummary);
 router.get('/department-summary',salaryController.getDepartmentWiseSummary);
+
+// ✅ NEW: Bulk delete route (MUST come BEFORE /:id routes)
+router.delete('/bulk', salaryController.bulkDeleteSalaries);
+
+// Single salary routes
 router.get('/:id',  salaryController.getSalaryById);
 router.put('/:id',  salaryController.updateSalary);
 router.delete('/:id',  salaryController.deleteSalary);

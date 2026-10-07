@@ -812,10 +812,8 @@ import {
   Payment as PaymentIcon,
   MoreVert as MoreVertIcon,
   Refresh as RefreshIcon,
-  Person as PersonIcon,
   CalendarToday as CalendarIcon,
   Work as WorkIcon,
-  TrendingUp as TrendingUpIcon,
 } from "@mui/icons-material";
 
 import axios from "axios";
@@ -824,7 +822,7 @@ import { hasPermission, ACTIONS, MODULES, PAGES } from '../../../utils/modulePer
 import AddProduction from "./AddProduction";
 import ViewProduction from "./ViewProduction";
 
-// Color constants matching TaxMaster component
+// Color constants
 const COLORS = {
   primary: '#063C3F',
   primaryLight: '#E8F0F1',
@@ -876,15 +874,12 @@ const AccessDenied = () => (
   </Box>
 );
 
-// Action Menu Component with permission checks
+// Action Menu Component
 const ActionMenu = ({ item, onView, onApprove, onReject, anchorEl, onClose, onOpen, isPaid, userPermissions, isSuperAdmin }) => {
-  // Check permissions
   const canView = isSuperAdmin || hasPermission(userPermissions, MODULES.PRODUCTION_MASTER, PAGES.PRODUCTION_MASTER, ACTIONS.VIEW);
-  const canUpdate = isSuperAdmin || hasPermission(userPermissions, MODULES.PRODUCTION_MASTER, PAGES.PRODUCTION_MASTER, ACTIONS.UPDATE);
   const canApprove = isSuperAdmin || hasPermission(userPermissions, MODULES.PRODUCTION_MASTER, PAGES.PRODUCTION_MASTER, ACTIONS.APPROVE);
   const canReject = isSuperAdmin || hasPermission(userPermissions, MODULES.PRODUCTION_MASTER, PAGES.PRODUCTION_MASTER, ACTIONS.REJECT);
 
-  // Only show approve/reject if status is pending and user has permission
   const isPending = item?.Status?.toLowerCase() === "pending" || item?.status?.toLowerCase() === "pending";
 
   return (
@@ -896,9 +891,7 @@ const ActionMenu = ({ item, onView, onApprove, onReject, anchorEl, onClose, onOp
           disabled={isPaid}
           sx={{
             color: COLORS.text.secondary,
-            '&:hover': {
-              bgcolor: `${COLORS.primary}20`
-            }
+            '&:hover': { bgcolor: `${COLORS.primary}20` }
           }}
         >
           <MoreVertIcon fontSize="small" />
@@ -920,13 +913,7 @@ const ActionMenu = ({ item, onView, onApprove, onReject, anchorEl, onClose, onOp
         }}
       >
         {canView && (
-          <MenuItem 
-            onClick={() => {
-              onView(item);
-              onClose();
-            }}
-            sx={{ py: 1.5 }}
-          >
+          <MenuItem onClick={() => { onView(item); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}>
               <ViewIcon fontSize="small" />
             </ListItemIcon>
@@ -943,13 +930,7 @@ const ActionMenu = ({ item, onView, onApprove, onReject, anchorEl, onClose, onOp
             <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />
             
             {canApprove && (
-              <MenuItem 
-                onClick={() => {
-                  onApprove(item);
-                  onClose();
-                }}
-                sx={{ py: 1.5 }}
-              >
+              <MenuItem onClick={() => { onApprove(item); onClose(); }} sx={{ py: 1.5 }}>
                 <ListItemIcon sx={{ color: '#059669', minWidth: 36 }}>
                   <ApproveIcon fontSize="small" />
                 </ListItemIcon>
@@ -962,13 +943,7 @@ const ActionMenu = ({ item, onView, onApprove, onReject, anchorEl, onClose, onOp
             )}
 
             {canReject && (
-              <MenuItem 
-                onClick={() => {
-                  onReject(item);
-                  onClose();
-                }}
-                sx={{ py: 1.5 }}
-              >
+              <MenuItem onClick={() => { onReject(item); onClose(); }} sx={{ py: 1.5 }}>
                 <ListItemIcon sx={{ color: '#DC2626', minWidth: 36 }}>
                   <RejectIcon fontSize="small" />
                 </ListItemIcon>
@@ -1015,12 +990,11 @@ const ProductionMaster = () => {
     severity: "success",
   });
 
-  // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
-  // Fetch user permissions from /api/auth/me
+  // Fetch user permissions
   useEffect(() => {
     const fetchUserPermissions = async () => {
       try {
@@ -1032,16 +1006,13 @@ const ProductionMaster = () => {
         }
 
         const response = await axios.get(`${BASE_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.data.success) {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
           
-          // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {
             setUserPermissions(userData.permissions);
           } else {
@@ -1061,20 +1032,11 @@ const ProductionMaster = () => {
     fetchUserPermissions();
   }, []);
 
-  // Check permission helper
   const checkPermission = (action) => {
-    // Super admin has all permissions
     if (isSuperAdmin) return true;
-    
-    return hasPermission(
-      userPermissions,
-      MODULES.PRODUCTION_MASTER,
-      PAGES.PRODUCTION_MASTER,
-      action
-    );
+    return hasPermission(userPermissions, MODULES.PRODUCTION_MASTER, PAGES.PRODUCTION_MASTER, action);
   };
 
-  // Permission checks
   const canViewPage = checkPermission(ACTIONS.VIEW);
   const canCreate = checkPermission(ACTIONS.CREATE);
   const canUpdate = checkPermission(ACTIONS.UPDATE);
@@ -1088,13 +1050,11 @@ const ProductionMaster = () => {
       setSearchTerm(searchInput);
       setPage(0);
     }, 500);
-
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Fetch productions - only if user has view permission
+  // Fetch productions
   const fetchProductions = useCallback(async () => {
-    // Only fetch if user has view permission
     if (!canViewPage && !isSuperAdmin) return;
     
     try {
@@ -1142,10 +1102,10 @@ const ProductionMaster = () => {
     showNotification("Data refreshed", "success");
   };
 
-  // Handle selection - only if user has update permission (for marking paid)
+  // Selection handlers
   const handleSelectAll = (event) => {
-    if (!canUpdate && !isSuperAdmin) {
-      showNotification("You don't have permission to mark records as paid", "error");
+    if (!canUpdate && !canDelete && !isSuperAdmin) {
+      showNotification("You don't have permission to perform bulk actions", "error");
       return;
     }
     
@@ -1157,8 +1117,8 @@ const ProductionMaster = () => {
   };
 
   const handleSelectOne = (id) => {
-    if (!canUpdate && !isSuperAdmin) {
-      showNotification("You don't have permission to mark records as paid", "error");
+    if (!canUpdate && !canDelete && !isSuperAdmin) {
+      showNotification("You don't have permission to perform bulk actions", "error");
       return;
     }
     
@@ -1186,8 +1146,8 @@ const ProductionMaster = () => {
     setSelected([]);
   };
 
+  // Approve / Reject
   const handleApproveReject = async (id, status) => {
-    // Check permission for approve/reject
     if (status === "Approved" && !canApprove && !isSuperAdmin) {
       showNotification("You don't have permission to approve production records", "error");
       return;
@@ -1199,13 +1159,11 @@ const ProductionMaster = () => {
     
     try {
       const token = localStorage.getItem("token");
-
       await axios.put(
         `${BASE_URL}/api/production/${id}/approve`,
         { status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       showNotification(`Production ${status.toLowerCase()} successfully`, "success");
       fetchProductions();
       setSelected([]);
@@ -1214,8 +1172,8 @@ const ProductionMaster = () => {
     }
   };
 
+  // Mark as Paid
   const handleMarkPaid = async () => {
-    // Check permission for marking paid (update permission)
     if (!canUpdate && !isSuperAdmin) {
       showNotification("You don't have permission to mark records as paid", "error");
       return;
@@ -1231,7 +1189,6 @@ const ProductionMaster = () => {
       setMarkPaidError("");
 
       const token = localStorage.getItem("token");
-
       const response = await axios.post(
         `${BASE_URL}/api/production/mark-paid`,
         { productionIds: selected },
@@ -1256,6 +1213,42 @@ const ProductionMaster = () => {
     }
   };
 
+  // ✅ Bulk Delete
+  const handleBulkDelete = async () => {
+    if (!canDelete && !isSuperAdmin) {
+      showNotification("You don't have permission to delete production records", "error");
+      return;
+    }
+    
+    if (selected.length === 0) return;
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await axios.delete(`${BASE_URL}/api/production/bulk`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { productionIds: selected }
+      });
+
+      if (response.data.success) {
+        showNotification(response.data.message || `${selected.length} production record(s) deleted successfully`, "success");
+        setSelected([]);
+        fetchProductions();
+      } else {
+        showNotification(response.data.message || "Failed to delete production records", "error");
+      }
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      showNotification(
+        error.response?.data?.message || "Failed to delete production records",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helpers
   const getEmployeeName = (prod) => {
     if (prod.employeeName) return prod.employeeName;
     if (prod.EmployeeID) {
@@ -1268,29 +1261,13 @@ const ProductionMaster = () => {
   const getStatusStyles = (status) => {
     switch (status?.toLowerCase()) {
       case "approved":
-        return {
-          bg: COLORS.status.success,
-          text: COLORS.primaryDark,
-          border: '#86efac'
-        };
+        return { bg: COLORS.status.success, text: COLORS.primaryDark, border: '#86efac' };
       case "rejected":
-        return {
-          bg: COLORS.status.error,
-          text: '#991b1b',
-          border: '#fecaca'
-        };
+        return { bg: COLORS.status.error, text: '#991b1b', border: '#fecaca' };
       case "paid":
-        return {
-          bg: COLORS.status.info,
-          text: '#075985',
-          border: '#bae6fd'
-        };
+        return { bg: COLORS.status.info, text: '#075985', border: '#bae6fd' };
       default:
-        return {
-          bg: COLORS.status.warning,
-          text: '#854d0e',
-          border: '#fed7aa'
-        };
+        return { bg: COLORS.status.warning, text: '#854d0e', border: '#fed7aa' };
     }
   };
 
@@ -1310,15 +1287,7 @@ const ProductionMaster = () => {
 
   const getAvatarColor = (employeeName) => {
     if (!employeeName) return COLORS.primary;
-
-    const colors = [
-      COLORS.primary,
-      COLORS.primaryDark,
-      '#074346',
-      '#0D696C',
-      '#128C7E'
-    ];
-
+    const colors = [COLORS.primary, COLORS.primaryDark, '#074346', '#0D696C', '#128C7E'];
     const charCode = employeeName.charCodeAt(0) || 0;
     return colors[charCode % colors.length];
   };
@@ -1374,30 +1343,14 @@ const ProductionMaster = () => {
     { value: "paid", label: "Paid" }
   ];
 
-  // Show loading state while permissions are being fetched
-  if (!permissionsLoaded) {
-    return <LoadingState />;
-  }
-
-  // If user doesn't have view permission, show access denied
-  if (!canViewPage && !isSuperAdmin) {
-    return <AccessDenied />;
-  }
+  if (!permissionsLoaded) return <LoadingState />;
+  if (!canViewPage && !isSuperAdmin) return <AccessDenied />;
 
   return (
     <Box sx={{ p: 2.5 }}>
       {/* Page Header */}
       <Box sx={{ mb: 2.5 }}>
-        <Typography
-          variant="h5"
-          component="h1"
-          sx={{
-            fontSize: '1.25rem',
-            fontWeight: 700,
-            color: COLORS.text.primary,
-            mb: 0.5
-          }}
-        >
+        <Typography variant="h5" component="h1" sx={{ fontSize: '1.25rem', fontWeight: 700, color: COLORS.text.primary, mb: 0.5 }}>
           Production Master
         </Typography>
         <Typography variant="body2" sx={{ fontSize: '0.75rem', color: COLORS.text.secondary }}>
@@ -1407,15 +1360,12 @@ const ProductionMaster = () => {
 
       {/* Action Bar */}
       <Paper sx={{
-        p: 1.5,
-        mb: 2.5,
-        borderRadius: 2,
+        p: 1.5, mb: 2.5, borderRadius: 2,
         bgcolor: COLORS.background.white,
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
         border: `1px solid ${COLORS.border}`
       }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center" justifyContent="space-between">
-          {/* Search and Filters */}
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1 }}>
             <TextField
               placeholder="Search employee, product, operation..."
@@ -1425,11 +1375,8 @@ const ProductionMaster = () => {
               sx={{
                 width: { xs: '100%', sm: 280 },
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: 1.5,
-                  fontSize: '0.75rem',
-                  '&:hover fieldset': {
-                    borderColor: COLORS.primary,
-                  },
+                  borderRadius: 1.5, fontSize: '0.75rem',
+                  '&:hover fieldset': { borderColor: COLORS.primary },
                 }
               }}
               InputProps={{
@@ -1439,44 +1386,28 @@ const ProductionMaster = () => {
                   </InputAdornment>
                 ),
                 sx: {
-                  height: 36,
-                  bgcolor: COLORS.background.light,
+                  height: 36, bgcolor: COLORS.background.light,
                   '& input': {
-                    padding: '6px 12px',
-                    fontSize: '0.75rem',
-                    color: COLORS.text.primary,
-                    '&::placeholder': {
-                      color: COLORS.text.tertiary,
-                      fontSize: '0.75rem'
-                    }
+                    padding: '6px 12px', fontSize: '0.75rem', color: COLORS.text.primary,
+                    '&::placeholder': { color: COLORS.text.tertiary, fontSize: '0.75rem' }
                   }
                 }
               }}
-              
             />
           </Stack>
 
-          {/* Action Buttons */}
           <Stack direction="row" spacing={1.5} alignItems="center">
-            {/* Mark Paid Button - Only show if user has update permission */}
+            {/* Mark Paid */}
             {(canUpdate || isSuperAdmin) && selected.length > 0 && (
               <Button
-                variant="outlined"
-                color="success"
+                variant="outlined" color="success"
                 startIcon={<PaymentIcon sx={{ fontSize: '1rem' }} />}
                 onClick={() => setOpenMarkPaidDialog(true)}
                 sx={{
-                  height: 36,
-                  borderRadius: 1.5,
-                  textTransform: 'none',
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  borderColor: '#86efac',
-                  color: '#059669',
-                  '&:hover': {
-                    borderColor: '#86efac',
-                    bgcolor: alpha('#059669', 0.1)
-                  }
+                  height: 36, borderRadius: 1.5, textTransform: 'none',
+                  fontSize: '0.75rem', fontWeight: 500,
+                  borderColor: '#86efac', color: '#059669',
+                  '&:hover': { borderColor: '#86efac', bgcolor: alpha('#059669', 0.1) }
                 }}
                 disabled={loading}
               >
@@ -1484,23 +1415,35 @@ const ProductionMaster = () => {
               </Button>
             )}
 
-            {/* Add Production Button - Only show if user has create permission */}
+            {/* ✅ Bulk Delete Button */}
+            {(canDelete || isSuperAdmin) && selected.length > 0 && (
+              <Button
+                variant="outlined" color="error"
+                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                onClick={handleBulkDelete}
+                disabled={loading}
+                sx={{
+                  height: 36, borderRadius: 1.5, textTransform: 'none',
+                  fontSize: '0.75rem', fontWeight: 500,
+                  borderColor: '#fee2e2', color: '#991b1b',
+                  '&:hover': { borderColor: '#fecaca', bgcolor: '#fee2e2' }
+                }}
+              >
+                Delete ({selected.length})
+              </Button>
+            )}
+
+            {/* Add Production */}
             {(canCreate || isSuperAdmin) && (
               <Button
                 variant="contained"
                 startIcon={<AddIcon sx={{ fontSize: '1rem' }} />}
                 onClick={() => setOpenAdd(true)}
                 sx={{
-                  height: 36,
-                  borderRadius: 1.5,
-                  bgcolor: COLORS.primary,
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  textTransform: 'none',
+                  height: 36, borderRadius: 1.5, bgcolor: COLORS.primary,
+                  fontSize: '0.75rem', fontWeight: 500, textTransform: 'none',
                   boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-                  '&:hover': {
-                    bgcolor: COLORS.primaryDark,
-                  }
+                  '&:hover': { bgcolor: COLORS.primaryDark }
                 }}
                 disabled={loading}
               >
@@ -1513,9 +1456,7 @@ const ProductionMaster = () => {
 
       {/* Production Table */}
       <Paper sx={{
-        width: '100%',
-        borderRadius: 2,
-        overflow: 'hidden',
+        width: '100%', borderRadius: 2, overflow: 'hidden',
         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
         border: `1px solid ${COLORS.border}`
       }}>
@@ -1524,14 +1465,9 @@ const ProductionMaster = () => {
             <TableHead>
               <TableRow sx={{
                 bgcolor: COLORS.background.tableHeader,
-                '& .MuiTableCell-root': {
-                  borderBottom: 'none',
-                  color: COLORS.text.light,
-                  py: 1.5
-                }
+                '& .MuiTableCell-root': { borderBottom: 'none', color: COLORS.text.light, py: 1.5 }
               }}>
-                {/* Checkbox Column - Only show if user has update permission (for marking paid) */}
-                {(canUpdate || isSuperAdmin) && (
+                {(canUpdate || canDelete || isSuperAdmin) && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
                       indeterminate={selected.length > 0 && selected.length < productions.length}
@@ -1539,100 +1475,30 @@ const ProductionMaster = () => {
                       onChange={handleSelectAll}
                       sx={{
                         color: COLORS.text.light,
-                        '&.Mui-checked': {
-                          color: COLORS.text.light,
-                        },
-                        '&.MuiCheckbox-indeterminate': {
-                          color: COLORS.text.light,
-                        },
-                        '& .MuiSvgIcon-root': {
-                          fontSize: '1.25rem'
-                        }
+                        '&.Mui-checked': { color: COLORS.text.light },
+                        '&.MuiCheckbox-indeterminate': { color: COLORS.text.light },
+                        '& .MuiSvgIcon-root': { fontSize: '1.25rem' }
                       }}
                       disabled={loading || productions.length === 0}
                     />
                   </TableCell>
                 )}
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Employee
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Date
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Product
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Operation
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Good Units
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Rejected
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Earnings
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
-                  Status
-                </TableCell>
-                <TableCell sx={{
-                  fontWeight: 600,
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  width: 60,
-                  color: COLORS.text.light
-                }} align="center">
-                  Actions
-                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Employee</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Date</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Product</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Operation</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Good Units</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Rejected</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Earnings</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.text.light }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', width: 60, color: COLORS.text.light }} align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={(canUpdate || isSuperAdmin) ? 10 : 9} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={(canUpdate || canDelete || isSuperAdmin) ? 10 : 9} align="center" sx={{ py: 6 }}>
                     <CircularProgress size={32} sx={{ color: COLORS.primary }} />
                     <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary, mt: 1 }}>
                       Loading production records...
@@ -1641,7 +1507,7 @@ const ProductionMaster = () => {
                 </TableRow>
               ) : productions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={(canUpdate || isSuperAdmin) ? 10 : 9} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={(canUpdate || canDelete || isSuperAdmin) ? 10 : 9} align="center" sx={{ py: 6 }}>
                     <Box sx={{ textAlign: 'center' }}>
                       <Typography variant="body1" sx={{ fontSize: '0.875rem', color: COLORS.text.secondary, fontWeight: 500 }}>
                         {searchTerm ? 'No production records found' : 'No production records available'}
@@ -1655,8 +1521,7 @@ const ProductionMaster = () => {
               ) : (
                 productions.map((production) => {
                   const isSelected = selected.includes(production._id);
-                  const isActionMenuOpen = Boolean(actionMenuAnchor) &&
-                    selectedProductionForAction?._id === production._id;
+                  const isActionMenuOpen = Boolean(actionMenuAnchor) && selectedProductionForAction?._id === production._id;
                   const employeeName = getEmployeeName(production);
                   const avatarColor = getAvatarColor(employeeName);
                   const statusStyles = getStatusStyles(production.Status || production.status);
@@ -1672,52 +1537,31 @@ const ProductionMaster = () => {
                       selected={isSelected}
                       sx={{
                         bgcolor: COLORS.background.white,
-                        '&:hover': {
-                          bgcolor: COLORS.background.hover
-                        },
+                        '&:hover': { bgcolor: COLORS.background.hover },
                         '&.Mui-selected': {
                           bgcolor: `${COLORS.primary}10`,
-                          '&:hover': {
-                            bgcolor: `${COLORS.primary}20`
-                          }
+                          '&:hover': { bgcolor: `${COLORS.primary}20` }
                         },
-                        '& .MuiTableCell-root': {
-                          py: 1.5,
-                          fontSize: '0.75rem',
-                          borderColor: COLORS.border
-                        }
+                        '& .MuiTableCell-root': { py: 1.5, fontSize: '0.75rem', borderColor: COLORS.border }
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has update permission */}
-                      {(canUpdate || isSuperAdmin) && (
+                      {(canUpdate || canDelete || isSuperAdmin) && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox
                             checked={isSelected}
                             onChange={() => handleSelectOne(production._id)}
-                            disabled={isPaid}
+                            disabled={isPaid && !canDelete && !isSuperAdmin}
                             sx={{
                               color: COLORS.primary,
-                              '&.Mui-checked': {
-                                color: COLORS.primary,
-                              },
-                              '& .MuiSvgIcon-root': {
-                                fontSize: '1.25rem'
-                              }
+                              '&.Mui-checked': { color: COLORS.primary },
+                              '& .MuiSvgIcon-root': { fontSize: '1.25rem' }
                             }}
                           />
                         </TableCell>
                       )}
                       <TableCell>
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                          <Avatar
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              bgcolor: avatarColor,
-                              fontSize: '0.7rem',
-                              fontWeight: 600
-                            }}
-                          >
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: avatarColor, fontSize: '0.7rem', fontWeight: 600 }}>
                             {getAvatarInitials(employeeName)}
                           </Avatar>
                           <Box>
@@ -1744,15 +1588,9 @@ const ProductionMaster = () => {
                           label={production.ProductName || production.productName || "-"}
                           size="small"
                           sx={{
-                            height: 20,
-                            fontSize: '0.65rem',
-                            fontWeight: 500,
-                            bgcolor: COLORS.background.light,
-                            color: COLORS.text.secondary,
-                            '& .MuiChip-icon': {
-                              fontSize: '0.7rem',
-                              ml: 0.5
-                            }
+                            height: 20, fontSize: '0.65rem', fontWeight: 500,
+                            bgcolor: COLORS.background.light, color: COLORS.text.secondary,
+                            '& .MuiChip-icon': { fontSize: '0.7rem', ml: 0.5 }
                           }}
                         />
                       </TableCell>
@@ -1781,15 +1619,10 @@ const ProductionMaster = () => {
                           label={getStatusText(production.Status || production.status)}
                           size="small"
                           sx={{
-                            fontSize: '0.65rem',
-                            fontWeight: 500,
-                            height: 24,
-                            bgcolor: statusStyles.bg,
-                            color: statusStyles.text,
+                            fontSize: '0.65rem', fontWeight: 500, height: 24,
+                            bgcolor: statusStyles.bg, color: statusStyles.text,
                             border: `1px solid ${statusStyles.border}`,
-                            '& .MuiChip-label': {
-                              px: 1
-                            }
+                            '& .MuiChip-label': { px: 1 }
                           }}
                         />
                       </TableCell>
@@ -1815,7 +1648,6 @@ const ProductionMaster = () => {
           </Table>
         </TableContainer>
 
-        {/* Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
@@ -1826,184 +1658,75 @@ const ProductionMaster = () => {
           onRowsPerPageChange={handleChangeRowsPerPage}
           sx={{
             borderTop: `1px solid ${COLORS.border}`,
-            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-              fontSize: '0.7rem',
-              color: COLORS.text.secondary
-            },
-            '& .MuiTablePagination-select': {
-              fontSize: '0.7rem'
-            },
-            '& .MuiTablePagination-actions button': {
-              color: COLORS.primary,
-            }
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: '0.7rem', color: COLORS.text.secondary },
+            '& .MuiTablePagination-select': { fontSize: '0.7rem' },
+            '& .MuiTablePagination-actions button': { color: COLORS.primary }
           }}
         />
       </Paper>
 
       {/* Mark as Paid Dialog */}
-      <Dialog
-        open={openMarkPaidDialog}
-        onClose={() => !markPaidLoading && setOpenMarkPaidDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 5,
-            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-            border: `1px solid ${COLORS.border}`,
-            overflow: 'hidden'
-          }
-        }}
+      <Dialog open={openMarkPaidDialog} onClose={() => !markPaidLoading && setOpenMarkPaidDialog(false)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { borderRadius: 5, border: `1px solid ${COLORS.border}`, overflow: 'hidden' } }}
       >
-        <DialogTitle sx={{
-          borderBottom: `1px solid ${COLORS.border}`,
-          py: 1.5,
-          px: 2.5,
-          bgcolor: COLORS.background.white,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
+        <DialogTitle sx={{ borderBottom: `1px solid ${COLORS.border}`, py: 1.5, px: 2.5, bgcolor: COLORS.background.white }}>
           <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.primary }}>
             Mark as Paid
           </Typography>
         </DialogTitle>
-
         <DialogContent sx={{ p: 2.5 }}>
           <Stack spacing={2}>
             <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.primary }}>
               You are about to mark <strong>{selected.length}</strong> production record(s) as paid.
             </Typography>
-
-            <Alert
-              severity="info"
-              sx={{
-                borderRadius: 1.5,
-                fontSize: '0.75rem',
-                py: 0.5,
-                '& .MuiAlert-icon': { fontSize: '1.25rem' }
-              }}
-            >
+            <Alert severity="info" sx={{ borderRadius: 1.5, fontSize: '0.75rem', py: 0.5 }}>
               This action will update the status of selected records to "Paid".
             </Alert>
-
             {markPaidError && (
-              <Alert
-                severity="error"
-                sx={{
-                  borderRadius: 1.5,
-                  fontSize: '0.75rem',
-                  py: 0.5,
-                  '& .MuiAlert-icon': { fontSize: '1.25rem' }
-                }}
-              >
+              <Alert severity="error" sx={{ borderRadius: 1.5, fontSize: '0.75rem', py: 0.5 }}>
                 {markPaidError}
               </Alert>
             )}
           </Stack>
         </DialogContent>
-
-        <DialogActions sx={{
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${COLORS.border}`,
-          bgcolor: COLORS.background.white,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: 1
-        }}>
-          <Button
-            onClick={() => setOpenMarkPaidDialog(false)}
-            disabled={markPaidLoading}
-            sx={{
-              height: 32,
-              px: 2,
-              borderRadius: 1.5,
-              border: `1px solid ${COLORS.border}`,
-              color: COLORS.text.secondary,
-              fontSize: '0.7rem',
-              fontWeight: 500,
-              textTransform: 'none',
-              '&:hover': {
-                borderColor: COLORS.primary,
-                bgcolor: `${COLORS.primary}10`
-              }
-            }}
+        <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${COLORS.border}`, bgcolor: COLORS.background.white, gap: 1 }}>
+          <Button onClick={() => setOpenMarkPaidDialog(false)} disabled={markPaidLoading}
+            sx={{ height: 32, px: 2, borderRadius: 1.5, border: `1px solid ${COLORS.border}`, color: COLORS.text.secondary, fontSize: '0.7rem', textTransform: 'none' }}
           >
             Cancel
           </Button>
-          <Button
-            variant="contained"
-            color="success"
-            onClick={handleMarkPaid}
-            disabled={markPaidLoading}
+          <Button variant="contained" color="success" onClick={handleMarkPaid} disabled={markPaidLoading}
             startIcon={markPaidLoading ? null : <PaymentIcon sx={{ fontSize: '1rem' }} />}
-            sx={{
-              height: 32,
-              px: 2,
-              borderRadius: 1.5,
-              bgcolor: '#059669',
-              fontSize: '0.7rem',
-              fontWeight: 500,
-              textTransform: 'none',
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-              '&:hover': {
-                bgcolor: '#047857',
-              },
-              '&:disabled': {
-                bgcolor: COLORS.border,
-                color: COLORS.text.tertiary
-              }
-            }}
+            sx={{ height: 32, px: 2, borderRadius: 1.5, bgcolor: '#059669', fontSize: '0.7rem', textTransform: 'none', '&:hover': { bgcolor: '#047857' } }}
           >
             {markPaidLoading ? 'Processing...' : 'Confirm Payment'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Modals - Only render if user has appropriate permissions */}
+      {/* Modals */}
       {(canCreate || isSuperAdmin) && (
         <AddProduction
           open={openAdd}
           onClose={() => setOpenAdd(false)}
-          onAdd={() => {
-            fetchProductions();
-            showNotification("Production added successfully", "success");
-          }}
+          onAdd={() => { fetchProductions(); showNotification("Production added successfully", "success"); }}
         />
       )}
 
       {(canViewPage || isSuperAdmin) && selectedProduction && (
         <ViewProduction
           open={openView}
-          onClose={() => {
-            setOpenView(false);
-            setSelectedProduction(null);
-          }}
+          onClose={() => { setOpenView(false); setSelectedProduction(null); }}
           production={selectedProduction}
         />
       )}
 
-      {/* Snackbar Notification */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      {/* Snackbar */}
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{
-            width: '100%',
-            borderRadius: 1.5,
-            fontSize: '0.75rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-            '& .MuiAlert-icon': {
-              fontSize: '1.25rem'
-            }
-          }}
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled"
+          sx={{ width: '100%', borderRadius: 1.5, fontSize: '0.75rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
         >
           {snackbar.message}
         </Alert>

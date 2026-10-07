@@ -1,4 +1,6 @@
 ﻿const LeaveType = require('../../models/HR/LeaveType');
+const mongoose = require('mongoose');
+
 // @desc    Get all leave types
 // @route   GET /api/leavetypes
 // @access  Public
@@ -86,7 +88,6 @@ const createLeaveType = async (req, res) => {
   try {
     const { Name, MaxDaysPerYear, Description, IsActive = true } = req.body;
     
-    // Check if leave type already exists
     const existingLeaveType = await LeaveType.findOne({ 
       Name: { $regex: new RegExp(`^${Name}$`, 'i') } 
     });
@@ -150,7 +151,6 @@ const updateLeaveType = async (req, res) => {
       });
     }
     
-    // Check if leave type name is being changed and if new name already exists
     if (req.body.Name && req.body.Name !== leaveType.Name) {
       const existingLeaveType = await LeaveType.findOne({ 
         Name: { $regex: new RegExp(`^${req.body.Name}$`, 'i') },
@@ -223,7 +223,6 @@ const deleteLeaveType = async (req, res) => {
       });
     }
     
-    // Check if leave type has any leave records
     const Leave = require('../../models/HR/Leave');
     const leaveCount = await Leave.countDocuments({ LeaveTypeID: leaveType._id });
     
@@ -234,7 +233,6 @@ const deleteLeaveType = async (req, res) => {
       });
     }
     
-    // HARD DELETE - permanently remove from database
     await LeaveType.findByIdAndDelete(req.params.id);
     
     res.json({
@@ -259,10 +257,76 @@ const deleteLeaveType = async (req, res) => {
   }
 };
 
+// ✅ NEW: @desc    Bulk delete leave types
+// @route   DELETE /api/leavetypes/bulk
+// @access  Public
+const bulkDeleteLeaveTypes = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No leave types selected for deletion'
+      });
+    }
+
+    const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid leave type IDs provided'
+      });
+    }
+
+    // Check which leave types are in use
+    const Leave = require('../../models/HR/Leave');
+    const usedLeaveTypes = await Leave.distinct('LeaveTypeID', {
+      LeaveTypeID: { $in: validIds }
+    });
+
+    const usedIds = usedLeaveTypes.map(id => id.toString());
+    const deletableIds = validIds.filter(id => !usedIds.includes(id.toString()));
+    const blockedIds = validIds.filter(id => usedIds.includes(id.toString()));
+
+    if (deletableIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete selected leave type(s) because they are being used in leave records.',
+        blockedCount: blockedIds.length,
+        blockedIds
+      });
+    }
+
+    const result = await LeaveType.deleteMany({ _id: { $in: deletableIds } });
+
+    const message = blockedIds.length > 0
+      ? `${result.deletedCount} leave type(s) deleted. ${blockedIds.length} could not be deleted because they are in use.`
+      : `${result.deletedCount} leave type(s) deleted successfully`;
+
+    res.status(200).json({
+      success: true,
+      message,
+      deletedCount: result.deletedCount,
+      blockedCount: blockedIds.length,
+      blockedIds: blockedIds.length > 0 ? blockedIds : undefined
+    });
+
+  } catch (error) {
+    console.error('Bulk delete leave types error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
 module.exports = {
   getLeaveTypes,
   getLeaveType,
   createLeaveType,
   updateLeaveType,
-  deleteLeaveType
+  deleteLeaveType,
+  bulkDeleteLeaveTypes // ✅ Added
 };

@@ -12,7 +12,8 @@ const {
   getVerification,
   listVerifications,
   generateReport,
-  getActiveVerification
+  getActiveVerification,
+  deleteVerification
 } = require('../../controllers/Inventory/psvController');
 
 const { protect } = require('../../middleware/authMiddleware');
@@ -780,6 +781,7 @@ router.get('/active/:warehouse_id', getActiveVerification);
  *       500:
  *         description: Server error
  */
+router.delete('/:id', deleteVerification);
 router.get('/:id', getVerification);
 
 /**

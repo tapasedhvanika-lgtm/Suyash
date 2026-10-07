@@ -238,6 +238,9 @@ const LeaveTypeMaster = () => {
   // Selected item
   const [selectedItem, setSelectedItem] = useState(null);
   
+  // ✅ NEW: Bulk delete loading state
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
   // Notification state
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -265,7 +268,6 @@ const LeaveTypeMaster = () => {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
           
-          // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {
             setUserPermissions(userData.permissions);
           } else {
@@ -285,7 +287,6 @@ const LeaveTypeMaster = () => {
 
   // Check permission helper
   const checkPermission = (action) => {
-    // Super admin has all permissions
     if (isSuperAdmin) return true;
     
     return hasPermission(
@@ -301,9 +302,10 @@ const LeaveTypeMaster = () => {
   const canCreate = checkPermission(ACTIONS.CREATE);
   const canUpdate = checkPermission(ACTIONS.UPDATE);
   const canDelete = checkPermission(ACTIONS.DELETE);
-useEffect(() => {
-  handleSearch();
-}, [searchTerm, data]);
+
+  useEffect(() => {
+    handleSearch();
+  }, [searchTerm, data]);
 
   // Debounce search
   useEffect(() => {
@@ -315,94 +317,90 @@ useEffect(() => {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Fetch data when mode changes - only if user has permission
+  // Fetch data when mode changes
   useEffect(() => {
-  if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
-    fetchData();   // ✅ only once
-  }
-}, [permissionsLoaded, canViewPage, isSuperAdmin, mode]);
+    if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
+      fetchData();
+    }
+  }, [permissionsLoaded, canViewPage, isSuperAdmin, mode]);
 
- const fetchData = async () => {
-  try {
-    setLoading(true);
-    const token = localStorage.getItem('token');
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
 
-    const params = new URLSearchParams();
-    params.append('page', page + 1);
-    params.append('limit', rowsPerPage);
+      const params = new URLSearchParams();
+      params.append('page', page + 1);
+      params.append('limit', rowsPerPage);
 
-    if (searchTerm) params.append('search', searchTerm);
+      if (searchTerm) params.append('search', searchTerm);
 
-    const endpoint =
-      mode === 'leave'
-        ? `${BASE_URL}/api/leavetypes`
-        : `${BASE_URL}/api/holidays`;
+      const endpoint =
+        mode === 'leave'
+          ? `${BASE_URL}/api/leavetypes`
+          : `${BASE_URL}/api/holidays`;
 
-    const response = await axios.get(
-      `${endpoint}?${params.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await axios.get(
+        `${endpoint}?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
         }
+      );
+
+      if (response.data.success) {
+        const formattedData = (response.data.data || []).map(item => ({
+          ...item,
+          name: item.name || item.Name || item.title || '',
+          description: item.description || item.Description || '',
+          max_days: item.max_days || item.MaxDaysPerYear || 0,
+          date: item.date || item.Date || '',
+          is_active: item.is_active ?? true
+        }));
+
+        setData(formattedData);
+        setFilteredData(formattedData);
+      } else {
+        showNotification('Failed to load data', 'error');
       }
-    );
 
-    if (response.data.success) {
-      const formattedData = (response.data.data || []).map(item => ({
-        ...item,
-        name: item.name || item.Name || item.title || '',
-        description: item.description || item.Description || '',
-        max_days: item.max_days || item.MaxDaysPerYear || 0,
-        date: item.date || item.Date || '',
-        is_active: item.is_active ?? true
-      }));
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      showNotification('Failed to load data. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      setData(formattedData);
-      setFilteredData(formattedData); // ✅ server-side filtering
-
-    } else {
-      showNotification('Failed to load data', 'error');
+  const handleSearch = () => {
+    if (!searchTerm) {
+      setFilteredData(data);
+      return;
     }
 
-  } catch (err) {
-    console.error('Error fetching data:', err);
-    showNotification('Failed to load data. Please try again.', 'error');
-  } finally {
-    setLoading(false);
-  }
-};
+    const value = searchTerm.toLowerCase();
 
-const handleSearch = () => {
-  if (!searchTerm) {
-    setFilteredData(data);
-    return;
-  }
+    const filtered = data.filter(item =>
+      item.name?.toLowerCase().includes(value) ||
+      item.description?.toLowerCase().includes(value)
+    );
 
-  const value = searchTerm.toLowerCase();
-
-  const filtered = data.filter(item =>
-    item.name?.toLowerCase().includes(value) ||
-    item.description?.toLowerCase().includes(value)
-  );
-
-  setFilteredData(filtered);
-};
+    setFilteredData(filtered);
+  };
   
-  // Handle refresh
   const handleRefresh = () => {
     fetchData();
     showNotification('Data refreshed', 'success');
   };
   
-  // Handle mode change
   const handleModeChange = (event, newMode) => {
     if (newMode !== null) {
       setMode(newMode);
+      setSelected([]);
     }
   };
-
   
-  // Handle select all - only if user has delete permission
   const handleSelectAll = (event) => {
     if (!canDelete) return;
     
@@ -413,7 +411,6 @@ const handleSearch = () => {
     }
   };
   
-  // Handle single selection - only if user has delete permission
   const handleSelect = (id) => {
     if (!canDelete) return;
     
@@ -429,20 +426,17 @@ const handleSearch = () => {
     setSelected(newSelected);
   };
   
-  // Handle page change
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
     setSelected([]);
   };
   
-  // Handle rows per page change
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
     setSelected([]);
   };
   
-  // Handle add item - INSTANT UPDATE
   const handleAddItem = (newItemFromBackend) => {
     const formattedItem = {
       ...newItemFromBackend,
@@ -454,7 +448,6 @@ const handleSearch = () => {
       is_active: newItemFromBackend.is_active ?? true
     };
 
-    // Add instantly to table (top position)
     setData((prev) => [formattedItem, ...prev]);
     setFilteredData((prev) => [formattedItem, ...prev]);
     setPage(0);
@@ -465,7 +458,6 @@ const handleSearch = () => {
     );
   };
   
-  // Handle edit item - INSTANT UPDATE
   const handleEditItem = (updatedItemFromBackend) => {
     const formattedItem = {
       ...updatedItemFromBackend,
@@ -477,14 +469,12 @@ const handleSearch = () => {
       is_active: updatedItemFromBackend.is_active ?? true
     };
 
-    // Update main data
     setData((prev) =>
       prev.map((item) =>
         item._id === formattedItem._id ? formattedItem : item
       )
     );
 
-    // Update filtered data
     setFilteredData((prev) =>
       prev.map((item) =>
         item._id === formattedItem._id ? formattedItem : item
@@ -497,25 +487,74 @@ const handleSearch = () => {
     );
   };
   
-  // Handle delete item - INSTANT UPDATE
   const handleDeleteItem = (itemId) => {
-    // Remove from data array
     const updatedData = data.filter(item => item._id !== itemId);
     setData(updatedData);
-    
-    // Remove from selected if present
     setSelected(selected.filter(id => id !== itemId));
     
     showNotification(`${mode === 'leave' ? 'Leave Type' : 'Holiday'} deleted successfully!`, 'success');
   };
   
-  // Handle bulk delete
-  const handleBulkDelete = () => {
-    if (!canDelete) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
+  // ✅ UPDATED: Handle bulk delete — now calls the actual API
+  const handleBulkDelete = async () => {
+    if (!canDelete && !isSuperAdmin) {
+      showNotification('You do not have permission to delete', 'error');
+      return;
+    }
+    if (selected.length === 0) return;
+
+    const itemLabel = mode === 'leave' ? 'leave type(s)' : 'holiday(s)';
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selected.length} ${itemLabel}? This action cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setBulkDeleteLoading(true);
+      const token = localStorage.getItem('token');
+
+      // Choose endpoint based on mode
+      const bulkEndpoint = mode === 'leave'
+        ? `${BASE_URL}/api/leavetypes/bulk`
+        : `${BASE_URL}/api/holidays/bulk`;
+
+      const response = await axios.delete(bulkEndpoint, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        data: { ids: selected } // DELETE with body
+      });
+
+      if (response.data.success) {
+        const deletedCount = response.data.deletedCount || selected.length;
+        showNotification(
+          response.data.message || `${deletedCount} ${itemLabel} deleted successfully`,
+          'success'
+        );
+
+        // Remove deleted rows from local state immediately for snappy UI
+        const selectedIds = [...selected];
+        setData(prev => prev.filter(d => !selectedIds.includes(d._id)));
+        setFilteredData(prev => prev.filter(d => !selectedIds.includes(d._id)));
+        setSelected([]);
+
+        // Then refresh from server to stay in sync
+        fetchData();
+      } else {
+        showNotification(response.data.message || 'Failed to delete', 'error');
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      showNotification(
+        error.response?.data?.message || 'Server error during bulk delete',
+        'error'
+      );
+    } finally {
+      setBulkDeleteLoading(false);
+    }
   };
   
-  // Action menu handlers
   const handleActionMenuOpen = (event, item) => {
     setActionMenuAnchor(event.currentTarget);
     setSelectedItemForAction(item);
@@ -526,7 +565,6 @@ const handleSearch = () => {
     setSelectedItemForAction(null);
   };
   
-  // Open edit modal
   const openEditModalHandler = (item) => {
     if (!canUpdate) return;
     setSelectedItem(item);
@@ -534,7 +572,6 @@ const handleSearch = () => {
     handleActionMenuClose();
   };
   
-  // Open view modal
   const openViewModalHandler = (item) => {
     if (!canViewPage) return;
     setSelectedItem(item);
@@ -542,7 +579,6 @@ const handleSearch = () => {
     handleActionMenuClose();
   };
   
-  // Open delete confirmation
   const openDeleteDialogHandler = (item) => {
     if (!canDelete) return;
     setSelectedItem(item);
@@ -550,7 +586,6 @@ const handleSearch = () => {
     handleActionMenuClose();
   };
   
-  // Show notification
   const showNotification = (message, severity) => {
     setSnackbar({
       open: true,
@@ -559,7 +594,6 @@ const handleSearch = () => {
     });
   };
   
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -569,7 +603,6 @@ const handleSearch = () => {
     });
   };
   
-  // Get item initials for avatar
   const getItemInitials = (itemName) => {
     if (!itemName) return mode === 'leave' ? 'L' : 'H';
     
@@ -581,7 +614,6 @@ const handleSearch = () => {
     return itemName.substring(0, 2).toUpperCase();
   };
   
-  // Get avatar color based on item name
   const getAvatarColor = (itemName) => {
     if (!itemName) return COLORS.primary;
     
@@ -597,18 +629,15 @@ const handleSearch = () => {
     return colors[charCode % colors.length];
   };
   
-  // Paginated data
   const paginatedData = filteredData.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage && !isSuperAdmin) {
     return <AccessDenied />;
   }
@@ -682,7 +711,6 @@ const handleSearch = () => {
         border: `1px solid ${COLORS.border}`
       }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center" justifyContent="space-between">
-          {/* Search */}
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1 }}>
             <TextField
               placeholder={`Search ${mode === 'leave' ? 'leave types' : 'holidays'}...`}
@@ -723,14 +751,17 @@ const handleSearch = () => {
             />
           </Stack>
 
-          {/* Action Buttons - Conditionally rendered based on permissions */}
           <Stack direction="row" spacing={1.5} alignItems="center">
-            {/* Bulk Delete Button - Only show if user has delete permission */}
+            {/* ✅ Bulk Delete Button - now wired to API */}
             {canDelete && selected.length > 0 && (
               <Button
                 variant="outlined"
                 color="error"
-                startIcon={<DeleteIcon sx={{ fontSize: '1rem' }} />}
+                startIcon={
+                  bulkDeleteLoading 
+                    ? <CircularProgress size={16} color="inherit" />
+                    : <DeleteIcon sx={{ fontSize: '1rem' }} />
+                }
                 onClick={handleBulkDelete}
                 sx={{ 
                   height: 36,
@@ -745,9 +776,9 @@ const handleSearch = () => {
                     bgcolor: '#fee2e2'
                   }
                 }}
-                disabled={loading}
+                disabled={loading || bulkDeleteLoading}
               >
-                Delete ({selected.length})
+                {bulkDeleteLoading ? 'Deleting...' : `Delete (${selected.length})`}
               </Button>
             )}
             
@@ -797,7 +828,6 @@ const handleSearch = () => {
                   py: 1.5
                 }
               }}>
-                {/* Checkbox Column - Only show if user has delete permission */}
                 {canDelete && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
@@ -820,45 +850,19 @@ const handleSearch = () => {
                     />
                   </TableCell>
                 )}
-                <TableCell sx={{ 
-                  fontWeight: 600, 
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   {mode === 'leave' ? 'Leave Type' : 'Holiday'}
                 </TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600, 
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   Description
                 </TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600, 
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   {mode === 'leave' ? 'Max Days' : 'Date'}
                 </TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600, 
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  color: COLORS.text.light
-                }}>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', color: COLORS.text.light }}>
                   Status
                 </TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600, 
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.5px',
-                  width: 60,
-                  color: COLORS.text.light
-                }} align="center">
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', width: 60, color: COLORS.text.light }} align="center">
                   Actions
                 </TableCell>
               </TableRow>
@@ -916,7 +920,6 @@ const handleSearch = () => {
                         }
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has delete permission */}
                       {canDelete && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox
@@ -1015,7 +1018,6 @@ const handleSearch = () => {
           </Table>
         </TableContainer>
 
-        {/* Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
@@ -1040,7 +1042,7 @@ const handleSearch = () => {
         />
       </Paper>
 
-      {/* Modal Components - Leave Types - Only render if user has appropriate permissions */}
+      {/* Modal Components - Leave Types */}
       {mode === 'leave' && (
         <>
           {canCreate && (
@@ -1098,7 +1100,7 @@ const handleSearch = () => {
         </>
       )}
 
-      {/* Modal Components - Holidays - Only render if user has appropriate permissions */}
+      {/* Modal Components - Holidays */}
       {mode === 'holiday' && (
         <>
           {canCreate && (

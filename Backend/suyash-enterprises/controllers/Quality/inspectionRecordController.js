@@ -647,7 +647,8 @@ const getRecordById = async (req, res) => {
     }
     return res.json({ success: true, data: record });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+   console.error('[getRecordById] ERROR:', err.stack);
+   return res.status(500).json({ success: false, message: err.message });
   }
 };
 

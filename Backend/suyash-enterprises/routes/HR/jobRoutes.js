@@ -7,21 +7,25 @@ const {
   getJobById,
   updateJob,
   closeJob,
-  deleteJob  
+  deleteJob,
+  bulkDeleteJobs // ✅ Added
 } = require('../../controllers/HR/jobController');
 const { protect } = require('../../middleware/authMiddleware');
 const { validate, jobValidation, validateId } = require('../../middleware/validationMiddleware');
 
 router.use(protect);
 
+// ✅ NEW: Bulk delete route — MUST come BEFORE /:id routes
+router.delete('/bulk', bulkDeleteJobs);
+
 router.route('/')
   .get(getJobs)
-  .post( validate(jobValidation), createJobOpening);
+  .post(validate(jobValidation), createJobOpening);
 
 router.route('/:id')
   .get(validate(validateId), getJobById)
-  .put(validate(validateId),  updateJob)
-  .delete(validate(validateId), deleteJob); 
+  .put(validate(validateId), updateJob)
+  .delete(validate(validateId), deleteJob);
 
 router.post('/:id/publish', validate(validateId), publishJob);
 router.post('/:id/close', validate(validateId), closeJob);

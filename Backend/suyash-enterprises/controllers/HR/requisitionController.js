@@ -108,7 +108,7 @@ const createRequisition = async (req, res) => {
       employmentType,
       reasonForHire,
       education,
-      experienceYears: parsedExperienceYears, // Store as string (e.g., "0-1", "2-3", "4-5", "5+")
+      experienceYears: parsedExperienceYears,
       skills: Array.isArray(skills) ? skills : (typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : []),
       budgetMin: parsedBudgetMin,
       budgetMax: parsedBudgetMax,
@@ -140,7 +140,7 @@ const createRequisition = async (req, res) => {
         requisitionId: requisition.requisitionId,
         _id: requisition._id,
         status: requisition.status,
-        experienceYears: requisition.experienceYears // Returns string like "0-1"
+        experienceYears: requisition.experienceYears
       },
       message: 'Requisition created successfully'
     });
@@ -217,7 +217,7 @@ const submitRequisition = async (req, res) => {
       steps: [
         {
           stepNumber: 1,
-          approverRole: 'SuperAdmin', // CEO has SuperAdmin role
+          approverRole: 'SuperAdmin',
           status: 'pending'
         }
       ],
@@ -234,7 +234,6 @@ const submitRequisition = async (req, res) => {
       })
       .select('_id Username Email');
 
-    // Send notifications to SuperAdmin/CEO
     for (const admin of superAdminUsers) {
       if (admin.RoleID) {
         await notificationService.createNotification({
@@ -252,7 +251,6 @@ const submitRequisition = async (req, res) => {
       }
     }
 
-    // Log audit
     await auditService.log(
       'SUBMIT',
       'Requisition',
@@ -404,7 +402,6 @@ const approveRequisition = async (req, res) => {
       }
     }
 
-    // Log audit
     await auditService.log(
       'APPROVE',
       'Requisition',
@@ -503,7 +500,6 @@ const rejectRequisition = async (req, res) => {
       });
     }
 
-    // Log audit
     await auditService.log(
       'REJECT',
       'Requisition',
@@ -580,7 +576,6 @@ const getRequisitions = async (req, res) => {
     const user = req.user;
     const userRole = user.RoleName;
 
-    // SuperAdmin/CEO sees all, others see only their own
     if (!['SuperAdmin', 'CEO', 'HR'].includes(userRole)) {
       filter.createdBy = user._id;
     }
@@ -666,7 +661,6 @@ const getRequisitionById = async (req, res) => {
       });
     }
 
-    // Check permissions - SuperAdmin/CEO can view all
     const user = req.user;
     const userRole = user.RoleName;
     
@@ -721,8 +715,6 @@ const updateRequisition = async (req, res) => {
       });
     }
 
- 
-
     if (requisition.status !== 'pending_approval') {
       return res.status(400).json({
         success: false,
@@ -734,16 +726,13 @@ const updateRequisition = async (req, res) => {
     const updateData = { ...req.body };
     forbiddenFields.forEach(field => delete updateData[field]);
 
-    // Handle skills conversion
     if (updateData.skills && typeof updateData.skills === 'string') {
       updateData.skills = updateData.skills.split(',').map(s => s.trim());
     }
 
-    // Handle experienceYears as string
     if (updateData.experienceYears !== undefined) {
       updateData.experienceYears = updateData.experienceYears?.toString().trim();
       
-      // Validate experienceYears is not empty
       if (!updateData.experienceYears) {
         return res.status(400).json({
           success: false,
@@ -752,7 +741,6 @@ const updateRequisition = async (req, res) => {
       }
     }
 
-    // Handle numeric fields validation if they're being updated
     if (updateData.noOfPositions !== undefined) {
       const parsedNoOfPositions = parseInt(updateData.noOfPositions);
       if (isNaN(parsedNoOfPositions) || parsedNoOfPositions < 1) {
@@ -881,6 +869,77 @@ const deleteRequisition = async (req, res) => {
   }
 };
 
+// ✅ NEW: @desc    Bulk delete requisitions
+// @route   DELETE /api/requisitions/bulk
+// @access  Private (SuperAdmin, HR)
+const bulkDeleteRequisitions = async (req, res) => {
+  try {
+    // Accept both 'ids' and 'requisitionIds' for flexibility
+    const { ids, requisitionIds } = req.body;
+    const incomingIds = ids || requisitionIds;
+
+    if (!incomingIds || !Array.isArray(incomingIds) || incomingIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No requisitions selected for deletion'
+      });
+    }
+
+    // Filter to valid ObjectIds only
+    const validIds = incomingIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+
+    if (validIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid requisition IDs provided'
+      });
+    }
+
+    // Find all requisitions first
+    const requisitions = await Requisition.find({ _id: { $in: validIds } });
+
+    if (requisitions.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No requisitions found with the given IDs'
+      });
+    }
+
+    // Delete requisitions and their approval flows
+    const deleteResult = await Requisition.deleteMany({ _id: { $in: validIds } });
+    await ApprovalFlow.deleteMany({ requisitionId: { $in: validIds } });
+
+    // Log audit for each
+    for (const reqDoc of requisitions) {
+      try {
+        await auditService.log(
+          'DELETE',
+          'Requisition',
+          reqDoc._id,
+          req.user,
+          { requisitionId: reqDoc.requisitionId, action: 'bulk_delete' },
+          req
+        );
+      } catch (auditErr) {
+        console.warn('Audit log failed for', reqDoc._id, auditErr.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${deleteResult.deletedCount} requisition(s) deleted successfully`,
+      deletedCount: deleteResult.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Bulk delete requisitions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+};
+
 // @desc    Add comment to requisition
 // @route   POST /api/requisitions/:id/comments
 // @access  Private
@@ -922,7 +981,6 @@ const addComment = async (req, res) => {
 
     await requisition.save();
 
-    // Notify creator if commenter is not creator
     if (requisition.createdBy.toString() !== req.user._id.toString()) {
       const creator = await User.findById(requisition.createdBy);
       if (creator) {
@@ -1108,5 +1166,6 @@ module.exports = {
   updateRequisition,
   addComment,
   getRequisitionStats,
-  deleteRequisition
+  deleteRequisition,
+  bulkDeleteRequisitions // ✅ Added
 };

@@ -661,3 +661,43 @@ exports.deleteTraining = async(req, res) => {
     }
 
 };
+
+
+/*
+|--------------------------------------------------------------------------
+| ✅ BULK DELETE TRAININGS (NEW)
+|--------------------------------------------------------------------------
+*/
+
+exports.bulkDeleteTrainings = async(req, res) => {
+
+    try {
+
+        const { trainingIds } = req.body;
+
+        if (!trainingIds || trainingIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No trainings selected for deletion"
+            });
+        }
+
+        const result = await Training.deleteMany({ _id: { $in: trainingIds } });
+
+        res.status(200).json({
+            success: true,
+            message: `${result.deletedCount} training(s) deleted successfully`
+        });
+
+    } catch (error) {
+
+        console.error("❌ Bulk delete training error:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Server error: " + error.message
+        });
+
+    }
+
+};
