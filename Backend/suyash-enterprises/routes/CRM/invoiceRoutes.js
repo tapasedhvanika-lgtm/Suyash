@@ -14,7 +14,7 @@
 //   - All necessary fields for frontend to render professional invoices
 // ─────────────────────────────────────────────────────────────────────────────
 
-const express = require('express');
+const express = require('express');                  
 const router = express.Router();
 const { protect } = require('../../middleware/authMiddleware');
 
@@ -27,6 +27,8 @@ const {
   submitIRN,
   cancelIRN,
   sendInvoice,
+  confirmInvoice,   
+  cancelInvoice,    
 
   // BE-013 — Payments
   createPaymentReceipt,
@@ -1284,6 +1286,8 @@ router.delete('/:id/cancel-irn', cancelIRN);
  *         description: Invoice not found
  */
 router.post('/:id/send', sendInvoice);
+router.put('/:id/confirm', confirmInvoice);
+router.put('/:id/cancel', cancelInvoice);
 
 /**
  * @swagger

@@ -69,6 +69,8 @@ exports.createDeliveryChallan = async (req, res) => {
     }
 
     const {
+      so_id,  
+       so_number, 
       vendor_id,
       dc_date,
       nature_of_processing,
@@ -280,8 +282,9 @@ const preparedItems = items ? await Promise.all(items.map(async (item) => {
       dc_number: dcNumber,
       dc_date: new Date(),
       nature_of_processing: nature_of_processing || '',
-      so_id: new mongoose.Types.ObjectId(),
-      so_number: '',
+     // so_id: new mongoose.Types.ObjectId(),
+     so_id: so_id ? new mongoose.Types.ObjectId(so_id) : null,
+      so_number: so_number || '',
       customer_po_number: '',
       company_id: company._id,
       company_name: company.name,
@@ -1619,8 +1622,6 @@ exports.bulkDeleteDeliveryChallans = async (req, res) => {
     });
   }
 };
-
-
 
 
 
