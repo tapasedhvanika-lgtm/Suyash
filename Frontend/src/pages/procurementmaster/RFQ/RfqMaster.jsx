@@ -1297,12 +1297,12 @@ const StatusChip = ({ status }) => {
   );
 };
 
-const ActionMenu = ({ item, onView, onSend, onSubmitQuote, onCompare, onCloseRfq, onClose, anchorEl, onOpen, sendingRfqId, permissions }) => {
-  const canView = hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.VIEW);
-  const canUpdate = hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.UPDATE);
-  const canReject = hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.REJECT);
+const ActionMenu = ({ item, onView, onSend, onSubmitQuote, onCompare, onCloseRfq, onClose, anchorEl, onOpen, sendingRfqId, permissions, isSuperAdmin }) => {
+const canView = isSuperAdmin || hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.VIEW);
+const canUpdate = isSuperAdmin || hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.UPDATE);
+const canReject = isSuperAdmin || hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.REJECT);
   
-  // Status-based action availability with permission checks - using backend statuses
+// Status-based action availability with permission checks - using backend statuses
   const canSend = item.status === 'Pending' && canUpdate;
   const canSubmitQuote = (item.status === 'Sent' || item.status === 'Partially Responded') && canUpdate;
   const canCompare = (item.status === 'Fully Responded' || item.status === 'Partially Responded') && canView;
@@ -2080,6 +2080,7 @@ const RFQMaster = () => {
                           onOpen={(e) => handleActionMenuOpen(e, rfq)}
                           sendingRfqId={sendingRfqId}
                           permissions={userPermissions}
+                          isSuperAdmin={isSuperAdmin}
                         />
                       </TableCell>
                     </TableRow>

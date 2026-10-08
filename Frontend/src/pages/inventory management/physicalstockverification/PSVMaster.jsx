@@ -1909,11 +1909,36 @@ const PSVMaster = () => {
     setSelected(newSelected);
   };
 
-  const handleBulkDelete = () => {
-    if (!canDelete) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
-  };
+  const handleBulkDelete = async () => {
+  if (!canDelete || selected.length === 0) return;
 
+  try {
+    for (const id of selected) {
+      await axios.delete(`${BASE_URL}/api/physical-verifications/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+    }
+
+    setSelected([]);
+    fetchPSVs();
+
+    showNotification(
+      'Physical Stock Verification deleted successfully!',
+      'success'
+    );
+
+  } catch (error) {
+    console.error('Bulk delete error:', error);
+
+    showNotification(
+      error.response?.data?.message ||
+        'Failed to delete Physical Stock Verification',
+      'error'
+    );
+  }
+};
   const handleAddPSV = () => {
     fetchPSVs();
     showNotification('Physical Stock Verification created successfully!', 'success');

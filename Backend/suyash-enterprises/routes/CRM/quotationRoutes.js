@@ -8,7 +8,7 @@ const {
   getQuotations, getQuotationTemplates, getQuotation,
   createQuotation, duplicateQuotation, downloadQuotationAsTemplate,
   reviseQuotation, sendQuotation, approveQuotation, rejectQuotation,
-  calculateItemCost,
+  deleteQuotation, calculateItemCost,
 } = require('../../controllers/CRM/quotationController');
 
 const { protect, authorize } = require('../../middleware/authMiddleware');
@@ -843,5 +843,7 @@ router.post('/:id/approve', protect, approveQuotation);
  *         $ref: '#/components/responses/QuotationNotFound'
  */
 router.post('/:id/reject', protect, rejectQuotation);
+// DELETE quotation
+router.delete('/:id', protect, deleteQuotation);
 
 module.exports = router;
