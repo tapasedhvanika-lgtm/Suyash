@@ -8,7 +8,7 @@ const getMaterials = async (req, res) => {
   try {
     const { page = 1, limit = 10, search, isActive } = req.query;
     
-    const query = {};
+    const query = { IsActive: true };
     if (isActive !== undefined) query.IsActive = isActive === 'true';
     
     if (search) {
@@ -213,6 +213,75 @@ const deleteMaterial = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+// @desc    Bulk delete materials (soft delete)
+// @route   POST /api/materials/bulk-delete
+// @access  Private
+const bulkDeleteMaterials = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide material IDs'
+      });
+    }
+
+    const Item = require('../../models/CRM/Item');
+
+    let deletedCount = 0;
+    const errors = [];
+
+    for (const id of ids) {
+      const material = await Material.findById(id);
+
+      if (!material) {
+        errors.push(`Material ${id} not found`);
+        continue;
+      }
+
+      const itemCount = await Item.countDocuments({
+        MaterialID: id,
+        IsActive: true
+      });
+
+      if (itemCount > 0) {
+        errors.push(
+          `Cannot delete ${material.MaterialName}. It is used in ${itemCount} active item(s).`
+        );
+        continue;
+      }
+
+      await RawMaterial.updateMany(
+        { MaterialID: id },
+        {
+          IsActive: false,
+          UpdatedBy: req.user._id
+        }
+      );
+
+      material.IsActive = false;
+      material.UpdatedBy = req.user._id;
+      await material.save();
+
+      deletedCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `${deletedCount} material(s) deleted successfully`,
+      deletedCount,
+      errors
+    });
+  } catch (error) {
+    console.error('Bulk delete materials error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
 
 // @desc    Get materials for dropdown
 // @route   GET /api/materials/dropdown
@@ -236,5 +305,6 @@ module.exports = {
   createMaterial,
   updateMaterial,
   deleteMaterial,
+  bulkDeleteMaterials,
   getMaterialsDropdown
 };

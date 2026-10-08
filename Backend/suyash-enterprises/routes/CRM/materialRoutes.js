@@ -6,6 +6,7 @@ const {
   createMaterial,
   updateMaterial,
   deleteMaterial,
+  bulkDeleteMaterials,
   getMaterialsDropdown
 } = require('../../controllers/CRM/materialController');
 const { protect } = require('../../middleware/authMiddleware');
@@ -548,6 +549,7 @@ router.put('/:id', updateMaterial);
  *       500:
  *         description: Server error
  */
+router.post('/bulk-delete', bulkDeleteMaterials);
 router.delete('/:id', deleteMaterial);
 
 module.exports = router;
