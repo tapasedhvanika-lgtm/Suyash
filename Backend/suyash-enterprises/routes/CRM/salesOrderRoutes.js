@@ -9,7 +9,7 @@
 //   app.use('/api/analytics',    salesOrderRoutes);   // for /otif endpoint
 //
 // ROUTE ORDER RULES (Express matches top-to-bottom):
-//   1. Named static routes  → /order-book, /delivery-due, /reports/*
+//   1. Named static routes  → /order-book, /delivery-due, /reports/*, /bulk-delete
 //   2. Collection routes    → GET /, POST /
 //   3. Param routes         → /:id, /:id/confirm, etc.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,6 +22,7 @@ const {
   uploadPoFile,
   createSalesOrder,
   deleteSalesOrder, 
+  bulkDeleteSalesOrders,
   getSalesOrders,
   getSalesOrderById,
   updateSalesOrder,
@@ -38,7 +39,8 @@ const {
   cancelSoLineItem,
   getReportSummary,
   getReportPendingDelivery,
-  updateSalesOrderStatus
+  updateSalesOrderStatus,
+  dispatchSalesOrderItems // ✅ हे इम्पोर्ट केले आहे
 } = require('../../controllers/CRM/salesOrderController');
 
 // ✅ Import vendor controller SEPARATELY
@@ -71,6 +73,40 @@ router.use(protect);
 //     MUST come before /:id routes to avoid Express treating the path
 //     segment as a dynamic param (e.g. "order-book" being read as id).
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @swagger
+ * /api/sales-orders/bulk-delete:
+ *   post:
+ *     summary: Bulk delete multiple Sales Orders
+ *     description: Permanently removes multiple Sales Orders from the database.
+ *                  Only allowed for orders with status 'Draft' or 'Cancelled'.
+ *     tags: ["01 — SO CRUD"]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of Sales Order IDs to delete
+ *                 example: ["665abc123def456789012345", "665abc123def456789012346"]
+ *     responses:
+ *       200:
+ *         description: Sales Orders deleted successfully
+ *       400:
+ *         description: Invalid payload or orders are not in Draft/Cancelled status
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/bulk-delete', bulkDeleteSalesOrders);
 
 /**
  * @swagger
@@ -541,6 +577,48 @@ router.post('/:id/acknowledge', acknowledgeSalesOrder);
  */
 router.post('/:id/cancel-line/:lineItemId', cancelSoLineItem);
 
+// ✅ ADDED: Dispatch route for ViewOrderModal
+/**
+ * @swagger
+ * /api/sales-orders/{id}/dispatch:
+ *   post:
+ *     summary: Dispatch multiple line items for a Sales Order
+ *     tags: ["02 — SO Delivery"]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/soId'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     lineItemId:
+ *                       type: string
+ *                     dispatchedQty:
+ *                       type: number
+ *                     dispatchDate:
+ *                       type: string
+ *                       format: date-time
+ *     responses:
+ *       200:
+ *         description: Items dispatched successfully
+ *       400:
+ *         description: Invalid payload or quantity exceeded
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Sales Order not found
+ */
+router.post('/:id/dispatch', dispatchSalesOrderItems);
+
 /**
  * @swagger
  * /api/sales-orders/{id}/delivery-status:
@@ -600,6 +678,7 @@ router.get('/:id/revisions', getSoRevisions);
  *         description: Sales Order not found
  */
 router.get('/:id/history', getSoHistory);
+
 /**
  * @swagger
  * /api/sales-orders/{id}:
@@ -638,7 +717,6 @@ router.get('/:id/history', getSoHistory);
  *         description: Sales Order not found
  */
 router.delete('/:id', deleteSalesOrder);
-
 
 /**
  * @swagger
@@ -713,204 +791,3 @@ router.delete('/:id', deleteSalesOrder);
 router.put('/:id/status', updateSalesOrderStatus);
 
 module.exports = router;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SWAGGER COMPONENT DEFINITIONS (referenced by the full swagger.yaml file)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * @swagger
- * components:
- *
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- *
- *   parameters:
- *     soId:
- *       in: path
- *       name: id
- *       required: true
- *       schema:
- *         type: string
- *         pattern: "^[a-f0-9]{24}$"
- *       description: MongoDB _id of the Sales Order
- *       example: "665abc123def456789012345"
- *
- *   schemas:
- *
- *     CreateSalesOrderRequest:
- *       type: object
- *       required:
- *         - customer_id
- *         - items
- *       properties:
- *         customer_id:
- *           type: string
- *           example: "6650a1b2c3d4e5f678901234"
- *         quotation_id:
- *           type: string
- *           nullable: true
- *         quotation_no:
- *           type: string
- *           nullable: true
- *         customer_po_number:
- *           type: string
- *         customer_po_date:
- *           type: string
- *           format: date
- *         payment_terms:
- *           type: string
- *         delivery_terms:
- *           type: string
- *           enum: [Ex-Works, "FOR Destination", CIF, FOB, ""]
- *         delivery_mode:
- *           type: string
- *           enum: [Road, Rail, Air, Sea, "Hand Delivery", ""]
- *         expected_delivery_date:
- *           type: string
- *           format: date
- *         internal_remarks:
- *           type: string
- *         currency:
- *           type: string
- *           enum: [INR, USD, EUR, GBP, AED]
- *           default: INR
- *         items:
- *           type: array
- *           minItems: 1
- *           items:
- *             $ref: '#/components/schemas/SOLineItemRequest'
- *
- *     SOLineItemRequest:
- *       type: object
- *       required:
- *         - item_id
- *         - ordered_qty
- *         - unit_price
- *       properties:
- *         item_id:
- *           type: string
- *           description: MongoDB ObjectId from Item Master
- *           example: "69c3b3d383de267dde1d683e"
- *         ordered_qty:
- *           type: number
- *           minimum: 0.001
- *           example: 500
- *         unit_price:
- *           type: number
- *           minimum: 0
- *           example: 285.50
- *         discount_percent:
- *           type: number
- *           minimum: 0
- *           maximum: 100
- *           default: 0
- *         required_date:
- *           type: string
- *           format: date
- *         committed_date:
- *           type: string
- *           format: date
- *         remarks:
- *           type: string
- *
- *     UpdateSORequest:
- *       type: object
- *       description: At least one field required. Header fields only.
- *       properties:
- *         expected_delivery_date:
- *           type: string
- *           format: date
- *         payment_terms:
- *           type: string
- *         delivery_terms:
- *           type: string
- *           enum: [Ex-Works, "FOR Destination", CIF, FOB, ""]
- *         delivery_mode:
- *           type: string
- *           enum: [Road, Rail, Air, Sea, "Hand Delivery", ""]
- *         transporter:
- *           type: string
- *         internal_remarks:
- *           type: string
- *         customer_po_number:
- *           type: string
- *         customer_po_date:
- *           type: string
- *           format: date
- *         shipping_address:
- *           $ref: '#/components/schemas/AddressSnapshot'
- *         billing_address:
- *           $ref: '#/components/schemas/AddressSnapshot'
- *         terms_conditions:
- *           type: array
- *           items:
- *             type: object
- *
- *     ReviseSORequest:
- *       type: object
- *       required: [reason]
- *       properties:
- *         reason:
- *           type: string
- *           minLength: 5
- *           example: "Customer reduced order qty from 500 to 400 due to project delay"
- *         items:
- *           type: array
- *           items:
- *             type: object
- *             required: [_id]
- *             properties:
- *               _id:
- *                 type: string
- *                 example: "665abc123def456789012abc"
- *               ordered_qty:
- *                 type: number
- *                 minimum: 0.001
- *               unit_price:
- *                 type: number
- *                 minimum: 0
- *               committed_date:
- *                 type: string
- *                 format: date
- *               required_date:
- *                 type: string
- *                 format: date
- *               discount_percent:
- *                 type: number
- *               remarks:
- *                 type: string
- *         expected_delivery_date:
- *           type: string
- *           format: date
- *         payment_terms:
- *           type: string
- *         delivery_terms:
- *           type: string
- *         internal_remarks:
- *           type: string
- *
- *     AddressSnapshot:
- *       type: object
- *       properties:
- *         line1:
- *           type: string
- *         line2:
- *           type: string
- *         city:
- *           type: string
- *         district:
- *           type: string
- *         state:
- *           type: string
- *         state_code:
- *           type: integer
- *         pincode:
- *           type: string
- *         country:
- *           type: string
- *           default: India
- */

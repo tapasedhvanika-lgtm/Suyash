@@ -3,26 +3,33 @@
 // services/Production/mrpQueue.js
 // Phase 05 — BE-018
 //
-// REQUIREMENT: "implement as async job (queue with Bull/BullMQ);
-//               return job_id immediately;
-//               poll status via GET /api/mrp/runs/:id/status"
-//
-// REQUIRES: Redis running at REDIS_URL (default: redis://127.0.0.1:6379)
-// Install Redis on Windows: https://github.com/microsoftarchive/redis/releases
-// Verify: redis-cli ping  →  should return PONG
+// UPDATED: Added retryStrategy to prevent infinite Redis connection spam.
+// UPDATED: Added graceful error handling for enqueueMrpRun and getJobStatus.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Queue = require('bull');
-const path = require('path');
 
 // ✅ FIX 1: Move requires to the TOP (outside the worker function)
 const { MrpRun } = require('../../models/Production/MrpRun');
-const { runMrpJob } = require('./mrpService');  // Note: './mrpService' not '../../services/Production/mrpService'
+const { runMrpJob } = require('./mrpService');
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
+// ── Redis Connection Options ──────────────────────────────────────────────────
+// ✅ FIX 2: Stop retrying after 3 attempts to prevent infinite error spam
+const redisOptions = {
+  retryStrategy: (times) => {
+    if (times > 3) {
+      console.warn('[MRP Queue] ⚠️ Redis connection failed 3 times. Stopping retries.');
+      return null; // Stop retrying
+    }
+    return Math.min(times * 500, 2000); // Retry after 0.5s, 1s, 1.5s
+  }
+};
+
 // ── Create Bull queue connected to Redis ──────────────────────────────────────
 const mrpQueue = new Queue('mrp-runs', REDIS_URL, {
+  redis: redisOptions,
   defaultJobOptions: {
     attempts:         2,                              // retry once on failure
     backoff:          { type: 'exponential', delay: 5000 },
@@ -33,7 +40,6 @@ const mrpQueue = new Queue('mrp-runs', REDIS_URL, {
 
 // ── Worker: process one MRP job at a time (CPU intensive) ────────────────────
 mrpQueue.process('run-mrp', 1, async (job) => {
-  // ✅ FIX 2: No require statements here anymore - use the imported modules
   await MrpRun.findByIdAndUpdate(job.data.mrpRunId, { status: 'Running' });
   await runMrpJob(job.data.mrpRunId, job);
 });
@@ -51,8 +57,14 @@ mrpQueue.on('failed', (job, err) => {
   console.error(`[MRP Queue] ✗ Job ${job.id} FAILED — MRP Run ${job.data.mrpRunId}:`, err.message);
 });
 
+// ✅ FIX 3: Suppress the error spam. Log once and move on.
 mrpQueue.on('error', (err) => {
-  console.error('[MRP Queue] Queue error (is Redis running?):', err.message);
+  // Only log if it's not the typical ECONNREFUSED to avoid terminal spam
+  if (err.message.includes('ECONNREFUSED')) {
+    // Silent fail or log once
+  } else {
+    console.error('[MRP Queue] Queue error:', err.message);
+  }
 });
 
 mrpQueue.on('stalled', (job) => {
@@ -61,51 +73,65 @@ mrpQueue.on('stalled', (job) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // enqueueMrpRun
-//
-// Called by: POST /api/mrp/run controller
-// After:     MrpRun document saved to MongoDB with status = 'Queued'
-// Returns:   { jobId } immediately — controller sends 202 response right away
-// Then:      Bull worker picks up job from Redis and calls runMrpJob()
 // ─────────────────────────────────────────────────────────────────────────────
 async function enqueueMrpRun(mrpRunId) {
-  const job = await mrpQueue.add(
-    'run-mrp',
-    { mrpRunId },
-  );
-  console.log(`[MRP Queue] MRP Run ${mrpRunId} added to queue as job ${job.id}`);
-  return { jobId: String(job.id) };
+  try {
+    // Check if queue is ready/connected before adding job
+    const isReady = await mrpQueue.isReady().catch(() => false);
+    
+    if (!isReady) {
+      throw new Error('MRP Queue is not connected to Redis. Please start Redis or check the connection.');
+    }
+
+    const job = await mrpQueue.add(
+      'run-mrp',
+      { mrpRunId },
+    );
+    console.log(`[MRP Queue] MRP Run ${mrpRunId} added to queue as job ${job.id}`);
+    return { jobId: String(job.id) };
+  } catch (error) {
+    console.error(`[MRP Queue] Failed to enqueue MRP Run ${mrpRunId}:`, error.message);
+    throw error; // Let the controller catch this and return 503
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // getJobStatus
-//
-// Called by: GET /api/mrp/runs/:id/status controller
-// Returns Bull job state:
-//   waiting   — job is in queue, not yet picked up
-//   active    — job is currently being processed (MRP is running)
-//   completed — job finished successfully
-//   failed    — job failed (check failedReason)
-//   delayed   — job is waiting for retry after failure
-//   unknown   — job not found in queue (may have been cleaned up)
 // ─────────────────────────────────────────────────────────────────────────────
 async function getJobStatus(jobId) {
-  const job = await mrpQueue.getJob(jobId);
+  try {
+    const isReady = await mrpQueue.isReady().catch(() => false);
+    if (!isReady) {
+      return {
+        state: 'unknown',
+        note:  'Redis is not connected — queue status unavailable',
+      };
+    }
 
-  if (!job) {
+    const job = await mrpQueue.getJob(jobId);
+
+    if (!job) {
+      return {
+        state: 'unknown',
+        note:  'Job not found in queue — either completed and cleaned up, or invalid job_id',
+      };
+    }
+
+    const state    = await job.getState();
+    const progress = job._progress || 0;
+
     return {
-      state: 'unknown',
-      note:  'Job not found in queue — either completed and cleaned up, or invalid job_id',
+      state,          // waiting | active | completed | failed | delayed
+      progress,       // 0-100
+      failedReason: job.failedReason || null,
+    };
+  } catch (error) {
+    console.error(`[MRP Queue] Failed to get job status for ${jobId}:`, error.message);
+    return {
+      state: 'error',
+      note:  `Failed to fetch job status: ${error.message}`,
     };
   }
-
-  const state    = await job.getState();
-  const progress = job._progress || 0;
-
-  return {
-    state,          // waiting | active | completed | failed | delayed
-    progress,       // 0-100 (incremented by mrpService as it processes items)
-    failedReason: job.failedReason || null,
-  };
 }
 
 module.exports = { enqueueMrpRun, getJobStatus };

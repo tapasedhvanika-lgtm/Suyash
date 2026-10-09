@@ -1,6 +1,6 @@
 // cron/dispatch/inTransitMonitor.js
 const cron = require('node-cron');
-const DeliveryChallan = require('../../models/Dispatch/DeliveryChallan');  // Fixed path - added one more ../
+const DeliveryChallan = require('../../models/Dispatch/DeliveryChallan');
 
 // Run every hour to check overdue deliveries
 const startInTransitMonitor = () => {
@@ -40,7 +40,7 @@ const startInTransitMonitor = () => {
       }
 
     } catch (error) {
-      console.error('[CRON] In-transit monitoring failed:', error);
+      console.error('[CRON] In-transit monitoring failed:', error.message);
     }
   });
 
@@ -62,11 +62,13 @@ const startInTransitMonitor = () => {
         console.log(`[CRITICAL] e-Way Bill for DC ${dc.dc_number} expires in < 1 hour at ${dc.eway_bill.eway_bill_validity_date}`);
       }
     } catch (error) {
-      console.error('[CRON] e-Way Bill expiry check failed:', error);
+      console.error('[CRON] e-Way Bill expiry check failed:', error.message);
     }
   });
 
   console.log('[CRON] In-transit monitoring scheduled — runs every hour');
 };
+
+startInTransitMonitor();
 
 module.exports = { startInTransitMonitor };

@@ -118,7 +118,9 @@ const gaugeRoutes = require('./routes/Quality/gauges');
 const inspectionPlanRoutes = require('./routes/Quality/inspectionPlans');
 const inspectionRecordRoutes = require('./routes/Quality/inspectionRecords');
 
-// Import in-transit monitor
+// ⚠️ NOTE: The '[MRQ Queue] Queue error' you see in the terminal is likely coming 
+// from this import below. If you want to stop the error spam, you can comment out 
+// this line OR check the inTransitMonitor.js file for Redis/MRQ initialization.
 require('./cron/dispatch/inTransitMonitor');
 
 const app = express();
@@ -496,9 +498,21 @@ const server = app.listen(PORT, HOST, () => {
   console.log('\n=================================\n');
 });
 
-// Handle unhandled promise rejections
+// ✅ FIX: Handle unhandled promise rejections gracefully
 process.on('unhandledRejection', (err) => {
   console.error('❌ Unhandled Rejection:', err.message);
+  
+  // ✅ FIX: Do NOT crash the server if Redis/MRP queue is unavailable
+  if (
+    err.message.includes('ECONNREFUSED') || 
+    err.message.includes('Redis') || 
+    err.message.includes('connect')
+  ) {
+    console.warn('⚠️ Redis connection failed, but server will continue running.');
+    return; // Do not close the server
+  }
+  
+  // For other critical errors, close the server
   server.close(() => process.exit(1));
 });
 
