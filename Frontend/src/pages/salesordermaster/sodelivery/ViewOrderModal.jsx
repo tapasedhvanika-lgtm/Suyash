@@ -5,8 +5,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Tabs,
-  Tab,
   Grid,
   Paper,
   Stack,
@@ -26,7 +24,10 @@ import {
   StepLabel,
   StepConnector,
   stepConnectorClasses,
-  styled
+  styled,
+  TextField,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -35,13 +36,14 @@ import {
   Receipt as ReceiptIcon,
   Description as DescriptionIcon,
   Inventory as InventoryIcon,
-  History as HistoryIcon,
   Business as BusinessIcon,
-  LocalShipping as ShippingIcon,
   MonetizationOn as MoneyIcon,
-  Person as PersonIcon,
-  AccessTime as AccessTimeIcon
+  AccessTime as AccessTimeIcon,
+  LocalShipping as ShippingIcon
 } from '@mui/icons-material';
+import axios from 'axios';
+import BASE_URL from '../../../config/Config';
+import { hasPermission, ACTIONS, MODULES, PAGES } from '../../../utils/modulePermissions';
 
 // Professional Color Scheme (consistent with other components)
 const COLORS = {
@@ -116,10 +118,16 @@ function CustomStepIcon(props) {
 
 const steps = ['Overview', 'Items', 'History'];
 
-const ViewOrderModal = ({ open, onClose, order }) => {
+const ViewOrderModal = ({ open, onClose, order, permissions = [], isSuperAdmin = false, onDispatchSuccess }) => {
   const [activeStep, setActiveStep] = useState(0);
+  const [dispatchQuantities, setDispatchQuantities] = useState({}); // { lineItemId: qty }
+  const [dispatchLoading, setDispatchLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   if (!order) return null;
+
+  // Check permission for dispatching
+  const canDispatch = isSuperAdmin || hasPermission(permissions, MODULES.ORDER_BOOK, PAGES.ORDER_BOOK, ACTIONS.UPDATE);
 
   const formatCurrency = (amount, currency = 'INR') => {
     if (!amount && amount !== 0) return '-';
@@ -164,6 +172,70 @@ const ViewOrderModal = ({ open, onClose, order }) => {
 
   const handleBack = () => {
     setActiveStep((prevStep) => prevStep - 1);
+  };
+
+  const handleDispatchQtyChange = (lineItemId, value) => {
+    setDispatchQuantities(prev => ({
+      ...prev,
+      [lineItemId]: value
+    }));
+  };
+
+  const handleDispatch = async () => {
+    // Build payload
+    const itemsToDispatch = [];
+    let hasError = false;
+
+    order.items.forEach(item => {
+      const qty = Number(dispatchQuantities[item._id] || 0);
+      if (qty > 0) {
+        if (qty > (item.ordered_qty - item.delivered_qty)) {
+          showNotification(`Dispatch quantity for ${item.part_no} cannot exceed pending quantity (${item.ordered_qty - item.delivered_qty})`, 'error');
+          hasError = true;
+          return;
+        }
+        itemsToDispatch.push({
+          lineItemId: item._id,
+          dispatchedQty: qty,
+          dispatchDate: new Date().toISOString()
+        });
+      }
+    });
+
+    if (hasError) return;
+
+    if (itemsToDispatch.length === 0) {
+      showNotification('Please enter a dispatch quantity for at least one item.', 'warning');
+      return;
+    }
+
+    setDispatchLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${BASE_URL}/api/sales-orders/${order._id}/dispatch`,
+        { items: itemsToDispatch },
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        showNotification('Items dispatched successfully! Order status updated.', 'success');
+        setDispatchQuantities({});
+        if (onDispatchSuccess) onDispatchSuccess();
+        setTimeout(() => onClose(), 1500); // Close modal after showing success
+      } else {
+        showNotification(response.data.message || 'Failed to dispatch items', 'error');
+      }
+    } catch (err) {
+      console.error('Dispatch error:', err);
+      showNotification(err.response?.data?.message || 'Failed to dispatch items', 'error');
+    } finally {
+      setDispatchLoading(false);
+    }
+  };
+
+  const showNotification = (message, severity) => {
+    setSnackbar({ open: true, message, severity });
   };
 
   // Helper function to render field
@@ -376,26 +448,57 @@ const ViewOrderModal = ({ open, onClose, order }) => {
                     <TableRow>
                       <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light }}>Part No.</TableCell>
                       <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light }}>Part Name</TableCell>
-                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light, align: 'right' }}>Qty</TableCell>
-                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light, align: 'right' }}>Unit</TableCell>
-                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light, align: 'right' }}>Unit Price</TableCell>
-                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light, align: 'right' }}>Total</TableCell>
+                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light }} align="right">Ordered</TableCell>
+                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light }} align="right">Delivered</TableCell>
+                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light }} align="right">Pending</TableCell>
+                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light }} align="right">Unit Price</TableCell>
+                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light }} align="right">Total</TableCell>
+                      {canDispatch && (
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.light, width: 120 }} align="center">
+                          Dispatch Qty
+                        </TableCell>
+                      )}
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {order.items?.map((item, idx) => (
-                      <TableRow key={idx} hover>
-                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600 }}>{item.part_no}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem' }}>{item.part_name}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right' }}>{item.ordered_qty}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right' }}>{item.unit}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right' }}>{formatCurrency(item.unit_price, order.currency)}</TableCell>
-                        <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.total_amount, order.currency)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {order.items?.map((item, idx) => {
+                      const pending = item.ordered_qty - (item.delivered_qty || 0);
+                      return (
+                        <TableRow key={idx} hover>
+                          <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600 }}>{item.part_no}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem' }}>{item.part_name}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right' }}>{item.ordered_qty}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right', color: COLORS.text.secondary }}>{item.delivered_qty || 0}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right', fontWeight: 600, color: pending > 0 ? '#D97706' : '#059669' }}>
+                            {pending}
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right' }}>{formatCurrency(item.unit_price, order.currency)}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.total_amount, order.currency)}</TableCell>
+                          
+                          {canDispatch && (
+                            <TableCell align="center" sx={{ py: 1 }}>
+                              {pending > 0 ? (
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  placeholder="0"
+                                  value={dispatchQuantities[item._id] || ''}
+                                  onChange={(e) => handleDispatchQtyChange(item._id, e.target.value)}
+                                  inputProps={{ min: 0, max: pending, style: { fontSize: '0.75rem', textAlign: 'center', padding: '4px 8px' } }}
+                                  sx={{ width: 80 }}
+                                  disabled={dispatchLoading}
+                                />
+                              ) : (
+                                <Chip label="Delivered" size="small" sx={{ fontSize: '0.6rem', bgcolor: '#D1FAE5', color: '#059669' }} />
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
                     {(!order.items || order.items.length === 0) && (
                       <TableRow>
-                        <TableCell colSpan={6} align="center" sx={{ fontSize: '0.75rem', color: COLORS.text.tertiary }}>
+                        <TableCell colSpan={canDispatch ? 8 : 7} align="center" sx={{ fontSize: '0.75rem', color: COLORS.text.tertiary }}>
                           No items found
                         </TableCell>
                       </TableRow>
@@ -501,97 +604,76 @@ const ViewOrderModal = ({ open, onClose, order }) => {
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
-          border: `1px solid ${COLORS.border}`,
-          overflow: 'hidden'
-        }
-      }}
-    >
-      <DialogTitle sx={{
-        borderBottom: `1px solid ${COLORS.border}`,
-        py: 1.5,
-        px: 2.5,
-        bgcolor: COLORS.background.tableHeader,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.light }}>
-          Order Details
-        </Typography>
-        <IconButton onClick={onClose} size="small" sx={{ color: COLORS.text.light }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-      
-      {/* Stepper */}
-      <Box sx={{ px: 2.5, pt: 2, bgcolor: COLORS.background.white }}>
-        <Stepper
-          activeStep={activeStep}
-          alternativeLabel
-          connector={<ColorConnector />}
-        >
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel StepIconComponent={CustomStepIcon}>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: COLORS.text.secondary }}>
-                  {label}
-                </Typography>
-              </StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-      </Box>
-      
-      <DialogContent sx={{ p: 2.5, bgcolor: COLORS.background.white }}>
-        {renderStepContent(activeStep)}
-      </DialogContent>
-      
-      <DialogActions sx={{
-        px: 2.5,
-        py: 1.5,
-        borderTop: `1px solid ${COLORS.border}`,
-        bgcolor: COLORS.background.white,
-        justifyContent: 'space-between'
-      }}>
-        <Button
-          onClick={handleBack}
-          disabled={activeStep === 0}
-          size="small"
-          startIcon={<NavigateBeforeIcon sx={{ fontSize: '1rem' }} />}
-          sx={{
-            height: 32,
-            px: 2,
-            borderRadius: 1.5,
+    <>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
             border: `1px solid ${COLORS.border}`,
-            color: COLORS.text.secondary,
-            fontSize: '0.7rem',
-            fontWeight: 500,
-            textTransform: 'none',
-            '&:hover': {
-              borderColor: COLORS.primary,
-              bgcolor: `${COLORS.primary}10`
-            }
-          }}
-        >
-          Back
-        </Button>
-        <Box>
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          borderBottom: `1px solid ${COLORS.border}`,
+          py: 1.5,
+          px: 2.5,
+          bgcolor: COLORS.background.tableHeader,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.light }}>
+            Order Details
+          </Typography>
+          <IconButton onClick={onClose} size="small" sx={{ color: COLORS.text.light }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        
+        {/* Stepper */}
+        <Box sx={{ px: 2.5, pt: 2, bgcolor: COLORS.background.white }}>
+          <Stepper
+            activeStep={activeStep}
+            alternativeLabel
+            connector={<ColorConnector />}
+          >
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel StepIconComponent={CustomStepIcon}>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: COLORS.text.secondary }}>
+                    {label}
+                  </Typography>
+                </StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+        </Box>
+        
+        <DialogContent sx={{ p: 2.5, bgcolor: COLORS.background.white }}>
+          {renderStepContent(activeStep)}
+        </DialogContent>
+        
+        <DialogActions sx={{
+          px: 2.5,
+          py: 1.5,
+          borderTop: `1px solid ${COLORS.border}`,
+          bgcolor: COLORS.background.white,
+          justifyContent: 'space-between'
+        }}>
           <Button
-            onClick={onClose}
+            onClick={handleBack}
+            disabled={activeStep === 0 || dispatchLoading}
             size="small"
+            startIcon={<NavigateBeforeIcon sx={{ fontSize: '1rem' }} />}
             sx={{
               height: 32,
               px: 2,
-              mr: 1,
               borderRadius: 1.5,
               border: `1px solid ${COLORS.border}`,
               color: COLORS.text.secondary,
@@ -604,49 +686,114 @@ const ViewOrderModal = ({ open, onClose, order }) => {
               }
             }}
           >
-            Close
+            Back
           </Button>
-          {activeStep === steps.length - 1 ? (
+          <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
-              variant="contained"
               onClick={onClose}
               size="small"
+              disabled={dispatchLoading}
               sx={{
                 height: 32,
                 px: 2,
                 borderRadius: 1.5,
-                bgcolor: COLORS.primary,
+                border: `1px solid ${COLORS.border}`,
+                color: COLORS.text.secondary,
                 fontSize: '0.7rem',
                 fontWeight: 500,
                 textTransform: 'none',
-                '&:hover': { bgcolor: COLORS.primaryDark }
+                '&:hover': {
+                  borderColor: COLORS.primary,
+                  bgcolor: `${COLORS.primary}10`
+                }
               }}
             >
-              Done
+              Close
             </Button>
-          ) : (
-            <Button
-              variant="contained"
-              onClick={handleNext}
-              size="small"
-              endIcon={<NavigateNextIcon sx={{ fontSize: '1rem' }} />}
-              sx={{
-                height: 32,
-                px: 2,
-                borderRadius: 1.5,
-                bgcolor: COLORS.primary,
-                fontSize: '0.7rem',
-                fontWeight: 500,
-                textTransform: 'none',
-                '&:hover': { bgcolor: COLORS.primaryDark }
-              }}
-            >
-              Next
-            </Button>
-          )}
-        </Box>
-      </DialogActions>
-    </Dialog>
+            
+            {/* Show Dispatch button only on Items step, if user has permission, and order is dispatchable */}
+            {activeStep === 1 && canDispatch && (
+              <Button
+                variant="contained"
+                onClick={handleDispatch}
+                disabled={dispatchLoading || Object.keys(dispatchQuantities).length === 0}
+                startIcon={<ShippingIcon sx={{ fontSize: '1rem' }} />}
+                sx={{
+                  height: 32,
+                  px: 2,
+                  borderRadius: 1.5,
+                  bgcolor: COLORS.primary,
+                  fontSize: '0.7rem',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: COLORS.primaryDark }
+                }}
+              >
+                {dispatchLoading ? 'Dispatching...' : 'Dispatch Items'}
+              </Button>
+            )}
+
+            {activeStep === steps.length - 1 ? (
+              <Button
+                variant="contained"
+                onClick={onClose}
+                size="small"
+                sx={{
+                  height: 32,
+                  px: 2,
+                  borderRadius: 1.5,
+                  bgcolor: COLORS.primary,
+                  fontSize: '0.7rem',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: COLORS.primaryDark }
+                }}
+              >
+                Done
+              </Button>
+            ) : (
+              activeStep !== 1 && (
+                <Button
+                  variant="contained"
+                  onClick={handleNext}
+                  size="small"
+                  endIcon={<NavigateNextIcon sx={{ fontSize: '1rem' }} />}
+                  sx={{
+                    height: 32,
+                    px: 2,
+                    borderRadius: 1.5,
+                    bgcolor: COLORS.primary,
+                    fontSize: '0.7rem',
+                    fontWeight: 500,
+                    textTransform: 'none',
+                    '&:hover': { bgcolor: COLORS.primaryDark }
+                  }}
+                >
+                  Next
+                </Button>
+              )
+            )}
+          </Box>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar Notification */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%', borderRadius: 1.5, fontSize: '0.75rem' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </>
   );
 };
 

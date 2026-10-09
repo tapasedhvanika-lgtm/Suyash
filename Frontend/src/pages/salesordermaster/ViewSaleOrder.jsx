@@ -449,13 +449,15 @@ const ViewSaleOrder = ({ open, onClose, so }) => {
                       <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600 }}>Unit</TableCell>
                       <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, align: 'right' }}>Unit Price</TableCell>
                       <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, align: 'right' }}>Discount %</TableCell>
-                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, align: 'right' }}>Total</TableCell>
+                      <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, align: 'right' }}>Total (Incl. Tax)</TableCell>
                       <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600 }}>Status</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {so.items?.map((item, idx) => {
-                      const itemTotal = item.ordered_qty * item.unit_price * (1 - (item.discount_percent / 100));
+                      // ✅ FIXED: Use the backend calculated total_amount instead of recalculating manually.
+                      // The backend pre-save hook already calculates this accurately including GST.
+                      const itemTotal = item.total_amount || (item.ordered_qty * item.unit_price * (1 - (item.discount_percent / 100)));
                       const itemStatusColors = STATUS_COLORS[item.item_status] || { bg: '#F1F5F9', color: '#475569' };
                       
                       return (
@@ -609,7 +611,8 @@ const ViewSaleOrder = ({ open, onClose, so }) => {
                   {renderField('Last Updated', formatDateTime(so.updatedAt))}
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  {renderField('Created By', so.created_by?.name || so.created_by?.email || '-' )}
+                  {/* ✅ FIXED: Backend populates 'Username', not 'name' */}
+                  {renderField('Created By', so.created_by?.Username || so.created_by?.email || '-' )}
                 </Grid>
               </Grid>
             </Paper>

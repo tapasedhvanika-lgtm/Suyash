@@ -2,8 +2,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // controllers/Production/mrpController.js
 // Phase 05 — BE-018
+// UPDATED: Added missing mongoose import (needed for deleteMrpRun)
 // ─────────────────────────────────────────────────────────────────────────────
 
+const mongoose = require('mongoose'); // ✅ Added missing import
 const { MrpRun } = require('../../models/Production/MrpRun');
 const { enqueueMrpRun, getJobStatus } = require('../../services/Production/mrpQueue');
 
@@ -32,29 +34,29 @@ exports.triggerMrpRun = async (req, res) => {
       lastRunReference = lastRun ? lastRun.run_date : null;
     }
 
-  const run = await MrpRun.create({
-  run_type,
-  planning_horizon,
-  triggered_by: req.user._id,
-  status: 'Queued',
-  so_ids_considered: so_ids,
-  last_run_reference: lastRunReference,
-});
+    const run = await MrpRun.create({
+      run_type,
+      planning_horizon,
+      triggered_by: req.user._id,
+      status: 'Queued',
+      so_ids_considered: so_ids,
+      last_run_reference: lastRunReference,
+    });
 
-let jobId;
-try {
-  ({ jobId } = await enqueueMrpRun(String(run._id)));
-} catch (queueErr) {
-  console.error('[MRP] enqueueMrpRun failed, Redis unreachable:', queueErr.message);
-  await MrpRun.deleteOne({ _id: run._id });   // remove orphaned Queued run
-  return res.status(503).json({
-    success: false,
-    message: 'MRP queue is unavailable. Redis connection failed — check queue service.',
-  });
-}
+    let jobId;
+    try {
+      ({ jobId } = await enqueueMrpRun(String(run._id)));
+    } catch (queueErr) {
+      console.error('[MRP] enqueueMrpRun failed, Redis unreachable:', queueErr.message);
+      await MrpRun.deleteOne({ _id: run._id });   // remove orphaned Queued run
+      return res.status(503).json({
+        success: false,
+        message: 'MRP queue is unavailable. Redis connection failed — check queue service.',
+      });
+    }
 
-run.job_id = jobId;
-await run.save();
+    run.job_id = jobId;
+    await run.save();
 
     return res.status(202).json({
       success: true,
@@ -65,7 +67,7 @@ await run.save();
         job_id: jobId,
         run_type,
         planning_horizon,
-        status: 'Queued',  // ← Return 'Queued' status
+        status: 'Queued',
       },
     });
   } catch (err) {
@@ -73,6 +75,7 @@ await run.save();
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/mrp/runs
 // List all MRP runs
@@ -88,7 +91,7 @@ exports.listMrpRuns = async (req, res) => {
 
     const [runs, total] = await Promise.all([
       MrpRun.find(filter)
-        .select('-mrp_lines') // exclude heavy subdocs in list
+        .select('-mrp_lines')
         .populate('triggered_by', 'name email')
         .sort({ run_date: -1 })
         .skip(skip)
@@ -165,7 +168,12 @@ exports.getMrpRunStatus = async (req, res) => {
 
     let queueStatus = null;
     if (run.job_id) {
-      queueStatus = await getJobStatus(run.job_id);
+      try {
+        queueStatus = await getJobStatus(run.job_id);
+      } catch (err) {
+        // Redis might be down — don't crash the request
+        console.warn('[MRP] getJobStatus failed (Redis unreachable):', err.message);
+      }
     }
 
     return res.json({
@@ -204,7 +212,6 @@ exports.deleteMrpRun = async (req, res) => {
       });
     }
 
-    // Prevent deletion of running or queued runs
     if (run.status === 'Running' || run.status === 'Queued') {
       return res.status(400).json({ 
         success: false, 
@@ -212,8 +219,6 @@ exports.deleteMrpRun = async (req, res) => {
       });
     }
 
-    // Optional: Check if PRs/WOs generated from this run are already used elsewhere
-    // This is a soft check - you might want to add more logic here
     if (run.pr_generated && run.pr_generated.length > 0) {
       const PurchaseRequisition = mongoose.model('PurchaseRequisition');
       const prs = await PurchaseRequisition.find({
@@ -244,12 +249,8 @@ exports.deleteMrpRun = async (req, res) => {
       }
     }
 
-    // Optional: Cascade delete or just remove references
-    // Here we're just deleting the MRP run document
-    // PRs and WOs remain in the system (just their references are removed)
     await run.deleteOne();
 
-    // Log the deletion for audit purposes
     console.log(`[MRP] MRP run ${run.mrp_run_id} (${run._id}) deleted by user ${req.user._id}`);
 
     return res.json({
