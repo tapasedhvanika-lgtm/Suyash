@@ -7,7 +7,8 @@ const {
   getAllGRNs,
   getGRNById,
   getPOTimeline,       
-  getPONewGRNItems    
+  getPONewGRNItems, 
+    bulkDeleteGRNs   
 } = require('../../controllers/Procurement/grnController');
 
 const { protect, authorize } = require('../../middleware/authMiddleware');
@@ -409,6 +410,9 @@ router.use(protect);
  *       500:
  *         description: Server error
  */
+
+router.post('/bulk-delete', bulkDeleteGRNs);
+
 router.post('/', createGRN);
 
 /**

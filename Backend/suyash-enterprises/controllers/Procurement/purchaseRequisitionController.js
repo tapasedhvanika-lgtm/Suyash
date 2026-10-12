@@ -1053,3 +1053,78 @@ exports.getPendingRFQRequisitions = async (req, res) => {
     });
   }
 };
+// ======================================================
+// BULK DELETE PURCHASE REQUISITIONS
+// POST /api/purchase-requisitions/bulk-delete
+// ======================================================
+exports.bulkDeletePurchaseRequisitions = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide purchase requisition IDs to delete'
+      });
+    }
+
+    const deletableStatuses = ['Draft', 'Submitted', 'Rejected', 'Approved'];
+
+    const deletedPRs = [];
+    const failedPRs = [];
+
+    for (const id of ids) {
+      const pr = await PurchaseRequisition.findById(id);
+
+      if (!pr) {
+        failedPRs.push({
+          id,
+          reason: 'Purchase requisition not found'
+        });
+        continue;
+      }
+
+      if (!deletableStatuses.includes(pr.status)) {
+        failedPRs.push({
+          id,
+          pr_number: pr.pr_number,
+          reason: `Cannot delete PR with status: ${pr.status}`
+        });
+        continue;
+      }
+
+      if (pr.po_ids && pr.po_ids.length > 0) {
+        failedPRs.push({
+          id,
+          pr_number: pr.pr_number,
+          reason: `PR has ${pr.po_ids.length} associated Purchase Order(s)`
+        });
+        continue;
+      }
+
+      await pr.deleteOne();
+
+      deletedPRs.push({
+        id: pr._id,
+        pr_number: pr.pr_number
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${deletedPRs.length} purchase requisition(s) deleted successfully`,
+      deletedCount: deletedPRs.length,
+      deletedPRs,
+      failedPRs
+    });
+
+  } catch (error) {
+    console.error('Bulk delete PRs error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to bulk delete purchase requisitions',
+      error: error.message
+    });
+  }
+};

@@ -1249,3 +1249,127 @@ exports.getGRNById = async (req, res) => {
     });
   }
 };
+// ======================================================
+// BULK DELETE GRNs
+// POST /api/grns/bulk-delete
+// Only GRNs without stock transactions or completed QC
+// ======================================================
+exports.bulkDeleteGRNs = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide GRN IDs to delete'
+      });
+    }
+
+    if (!ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({
+        success: false,
+        message: 'One or more GRN IDs are invalid'
+      });
+    }
+
+    const grns = await GRN.find({ _id: { $in: ids } });
+
+    if (grns.length !== ids.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'One or more GRNs were not found'
+      });
+    }
+    console.log('GRN delete check:', grns.map(grn => ({
+  grn_number: grn.grn_number,
+  status: grn.status,
+  qc_status: grn.qc_status,
+  stock_transaction_count: (grn.stock_transaction_ids || []).length
+})));
+
+    const blockedGRNs = grns.filter(grn =>
+      (grn.stock_transaction_ids || []).length > 0 ||
+      grn.qc_status !== 'Pending' ||
+      grn.status !== 'Created'
+    );
+
+    if (blockedGRNs.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only GRNs with Pending QC, Created status, and no stock transactions can be deleted.',
+        blockedGRNs: blockedGRNs.map(grn => grn.grn_number)
+      });
+    }
+
+    const InspectionRecord = require('../../models/Quality/InspectionRecord');
+
+    for (const grn of grns) {
+      const inspectionRecords = await InspectionRecord.find({
+        grn_id: grn._id
+      });
+
+      if (inspectionRecords.some(record => record.status !== 'Pending')) {
+        return res.status(400).json({
+          success: false,
+          message: `GRN ${grn.grn_number} has a non-pending inspection record and cannot be deleted.`
+        });
+      }
+    }
+
+    // Remove pending inspection records linked to these GRNs.
+    await InspectionRecord.deleteMany({
+      grn_id: { $in: grns.map(grn => grn._id) },
+      status: 'Pending'
+    });
+
+    // Roll back received quantities on the related purchase orders.
+    for (const grn of grns) {
+      const po = await PurchaseOrder.findById(grn.po_id);
+
+      if (po) {
+        for (const receivedItem of grn.items || []) {
+          const poItem = po.items.find(item =>
+            item._id?.toString() === receivedItem.po_item_id?.toString()
+          );
+
+          if (poItem) {
+            poItem.received_qty = Math.max(
+              0,
+              (poItem.received_qty || 0) - (receivedItem.received_qty || 0)
+            );
+
+            poItem.pending_qty = Math.max(
+              0,
+              (poItem.ordered_qty || 0) - poItem.received_qty
+            );
+
+            poItem.item_status = poItem.received_qty === 0
+         ? 'Pending'
+          : poItem.pending_qty === 0
+           ? 'Fully Received'
+          : 'Partially Received';
+          }
+        }
+
+        await po.save();
+      }
+    }
+
+    await GRN.deleteMany({
+      _id: { $in: grns.map(grn => grn._id) }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `${grns.length} GRN(s) deleted successfully`,
+      deletedCount: grns.length
+    });
+  } catch (error) {
+    console.error('Bulk delete GRNs error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete GRNs',
+      error: error.message
+    });
+  }
+};
