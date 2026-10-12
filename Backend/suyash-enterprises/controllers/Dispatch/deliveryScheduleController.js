@@ -120,3 +120,30 @@ exports.bulkDeleteDeliverySchedules = async (req, res) => {
     });
   }
 };
+
+
+exports.deleteDeliverySchedule = async (req, res) => {
+  try {
+    const schedule = await DeliverySchedule.findById(req.params.id);
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Delivery Schedule not found'
+      });
+    }
+
+    await DeliverySchedule.findByIdAndDelete(req.params.id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Delivery Schedule deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete Delivery Schedule error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
