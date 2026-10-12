@@ -11,8 +11,7 @@ const {
   getDefectCodeById,
   updateDefectCode,
   deleteDefectCode,
-  toggleDefectCodeStatus,
-  bulkDeleteDefectCodes,
+  //bulkDeleteDefectCodes,
 } = require('../../controllers/Quality/defectCodeController');
 const { protect, authorize } = require('../../middleware/authMiddleware');
 
@@ -46,6 +45,8 @@ const fileFilter = (req, file, cb) => {
     cb(new Error('Only image files (JPEG, PNG, GIF, WEBP) are allowed'), false);
   }
 };
+
+
 
 const upload = multer({
   storage: storage,
@@ -240,6 +241,9 @@ router.post('/defect-codes',
  */
 router.get('/defect-codes', getAllDefectCodes);
 
+// Bulk Delete Route - Ye /:id wale routes se PEHLE hona chahiye
+//router.post('/defect-codes/bulk-delete', bulkDeleteDefectCodes);
+
 /**
  * @swagger
  * /api/defect-codes/{id}:
@@ -375,8 +379,6 @@ router.put('/defect-codes/:id',
  *       401:
  *         description: Unauthorized
  */
-router.post('/defect-codes/bulk-delete', bulkDeleteDefectCodes);
-router.put('/defect-codes/:id/toggle-status', toggleDefectCodeStatus);
 router.delete('/defect-codes/:id', deleteDefectCode);
 
 module.exports = router;

@@ -861,7 +861,7 @@
 
 // export default AddInvoice;
 
-
+//==========================================================================================================================
 
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -1019,22 +1019,52 @@ const AddInvoice = ({ open, onClose, onSuccess }) => {
     }
   }, [open]);
 
-  const handleSOChange = (event, newValue) => {
-    setSelectedSO(newValue);
-    setFormData(prev => ({ ...prev, so_id: newValue?._id || '', dc_ids: [], items: [] }));
-    setFieldErrors(prev => ({ ...prev, so_id: '' }));
+  // const handleSOChange = (event, newValue) => {
+  //   setSelectedSO(newValue);
+  //   setFormData(prev => ({ ...prev, so_id: newValue?._id || '', dc_ids: [], items: [] }));
+  //   setFieldErrors(prev => ({ ...prev, so_id: '' }));
     
-    // Get all delivery challans for this SO (don't filter by status, show all that have items)
-    const allDCs = newValue?.delivery_challans || [];
+  //   // Get all delivery challans for this SO (don't filter by status, show all that have items)
+  //   const allDCs = newValue?.delivery_challans || [];
     
-    // Filter delivery challans that have items and are not Sales Return type
-    const validDCs = allDCs.filter(dc => 
-      dc.items && dc.items.length > 0 && dc.dc_type !== 'Sales Return'
-    );
+  //   // Filter delivery challans that have items and are not Sales Return type
+  //   const validDCs = allDCs.filter(dc => 
+  //     dc.items && dc.items.length > 0 && dc.dc_type !== 'Sales Return'
+  //   );
     
-    setDeliveryChallans(validDCs);
-    console.log('Delivery challans for selected SO:', validDCs.length);
-  };
+  //   setDeliveryChallans(validDCs);
+  //   console.log('Delivery challans for selected SO:', validDCs.length);
+  // };
+  const handleSOChange = async (event, newValue) => {
+  setSelectedSO(newValue);
+  setFormData(prev => ({ ...prev, so_id: newValue?._id || '', dc_ids: [], items: [] }));
+  setFieldErrors(prev => ({ ...prev, so_id: '', dc_ids: '' }));
+  setDeliveryChallans([]);
+
+  if (!newValue?._id) return;
+
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${BASE_URL}/api/delivery-challans`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      params: { so_id: newValue._id }
+    });
+
+    if (response.data.success) {
+      const allDCs = response.data.data || [];
+      
+      const validDCs = allDCs.filter(dc => 
+        dc.items && dc.items.length > 0 && dc.dc_type !== 'Sales Return'
+      );
+      
+      setDeliveryChallans(validDCs);
+      console.log('Delivery challans fetched from API:', validDCs.length);
+    }
+  } catch (err) {
+    console.error('Error fetching delivery challans:', err);
+    setError('Failed to load delivery challans');
+  }
+};
 
   const handleDCChange = (dcId) => {
     const updatedDCIds = formData.dc_ids.includes(dcId)
@@ -1566,6 +1596,7 @@ const AddInvoice = ({ open, onClose, onSuccess }) => {
         );
 
       default:
+
         return null;
     }
   };

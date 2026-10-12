@@ -86,7 +86,7 @@ const STATUS_COLORS = {
   'Cancelled': { bg: '#FEE2E2', color: '#DC2626', border: '#FECACA' }
 };
 
-// SO Status Trxansitions
+// SO Status Transitions
 const SO_STATUS_TRANSITIONS = {
   'Draft': ['Confirmed', 'Cancelled'],
   'Pending': ['Confirmed', 'Cancelled'], 
@@ -124,18 +124,26 @@ const AccessDenied = () => (
 );
 
 // Action Menu Component with permission checks
-const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete, onStatusUpdate, onHistory, permissions }) => {
+const ActionMenu = ({ 
+  item, anchorEl, onOpen, onClose, onView, onEdit, onDelete, onStatusUpdate, onHistory, onAcknowledge, 
+  permissions, isSuperAdmin 
+}) => {
   const currentStatus = item?.status || 'Draft';
   const availableTransitions = SO_STATUS_TRANSITIONS[currentStatus] || [];
   
   // Permission checks
-  const canView = hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.VIEW);
-  const canUpdate = hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.UPDATE);
-  const canDelete = hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.DELETE);
-  const canApprove = hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.APPROVE);
+  const canView = isSuperAdmin || hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.VIEW);
+  const canUpdate = isSuperAdmin || hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.UPDATE);
+  const canDelete = isSuperAdmin || hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.DELETE);
+  const canApprove = isSuperAdmin || hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.APPROVE);
+  const canPrint = isSuperAdmin || hasPermission(permissions, MODULES.SALES_ORDER_MASTER, PAGES.SALES_ORDER_MASTER, ACTIONS.PRINT);
+
+  // Check if status allows acknowledgement
+  const allowedStatusesForAck = ['Confirmed', 'In Production', 'Ready for Dispatch', 'Partially Delivered', 'Fully Delivered'];
+  const canAcknowledge = canPrint && allowedStatusesForAck.includes(currentStatus);
 
   // Check if any action is available
-  const hasAnyAction = canView || canUpdate || canDelete || canApprove;
+  const hasAnyAction = canView || canUpdate || canDelete || canApprove || canPrint;
 
   if (!hasAnyAction) {
     return null;
@@ -165,7 +173,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
           elevation: 3,
           sx: {
             mt: 1,
-            minWidth: 180,
+            minWidth: 200,
             borderRadius: 2,
             border: `1px solid ${COLORS.border}`,
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
@@ -197,9 +205,23 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
             </ListItemText>
           </MenuItem>
         )}
+
+        {/* Print Acknowledgement Button */}
+        {canAcknowledge && (
+          <MenuItem onClick={() => { onAcknowledge(item); onClose(); }} sx={{ py: 1.5 }}>
+            <ListItemIcon sx={{ color: '#10B981', minWidth: 36 }}>
+              <PrintIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>
+              <Typography variant="body2" fontWeight={500} sx={{ color: '#10B981', fontSize: '0.75rem' }}>
+                Print Acknowledgement
+              </Typography>
+            </ListItemText>
+          </MenuItem>
+        )}
         
         {/* Confirm Button - Requires APPROVE permission */}
-        {/* {canApprove && currentStatus === 'Draft' && (
+        {canApprove && (currentStatus === 'Draft' || currentStatus === 'Pending') && (
           <MenuItem onClick={() => { onStatusUpdate(item, 'confirm'); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: '#10B981', minWidth: 36 }}>
               <CheckCircleIcon fontSize="small" />
@@ -211,23 +233,9 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
             </ListItemText>
           </MenuItem>
         )}
-         */}
-
-         {/* Confirm Button - Requires APPROVE permission */}
-{canApprove && (currentStatus === 'Draft' || currentStatus === 'Pending') && (  // ✅ MODIFY THIS LINE
-  <MenuItem onClick={() => { onStatusUpdate(item, 'confirm'); onClose(); }} sx={{ py: 1.5 }}>
-    <ListItemIcon sx={{ color: '#10B981', minWidth: 36 }}>
-      <CheckCircleIcon fontSize="small" />
-    </ListItemIcon>
-    <ListItemText>
-      <Typography variant="body2" fontWeight={500} sx={{ color: '#10B981', fontSize: '0.75rem' }}>
-        Confirm
-      </Typography>
-    </ListItemText>
-  </MenuItem>
-)}
+        
         {/* Regular Status Update for other transitions - Requires UPDATE permission */}
-        {/* {canUpdate && availableTransitions.length > 0 && currentStatus !== 'Draft' && (
+        {canUpdate && availableTransitions.length > 0 && currentStatus !== 'Draft' && currentStatus !== 'Pending' && (
           <MenuItem onClick={() => { onStatusUpdate(item, 'regular'); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: '#F59E0B', minWidth: 36 }}>
               <SendIcon fontSize="small" />
@@ -238,20 +246,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
               </Typography>
             </ListItemText>
           </MenuItem>
-        )} */}
-        {/* Regular Status Update for other transitions - Requires UPDATE permission */}
-{canUpdate && availableTransitions.length > 0 && currentStatus !== 'Draft' && currentStatus !== 'Pending' && (  // ✅ MODIFY THIS LINE
-  <MenuItem onClick={() => { onStatusUpdate(item, 'regular'); onClose(); }} sx={{ py: 1.5 }}>
-    <ListItemIcon sx={{ color: '#F59E0B', minWidth: 36 }}>
-      <SendIcon fontSize="small" />
-    </ListItemIcon>
-    <ListItemText>
-      <Typography variant="body2" fontWeight={500} sx={{ color: '#F59E0B', fontSize: '0.75rem' }}>
-        Update Status
-      </Typography>
-    </ListItemText>
-  </MenuItem>
-)}
+        )}
         
         {/* History Button - Uses VIEW permission */}
         {canView && (
@@ -267,7 +262,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
           </MenuItem>
         )}
         
-        {(canView || canUpdate) && canDelete && <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />}
+        {(canView || canUpdate || canPrint) && canDelete && <Divider sx={{ my: 0.5, borderColor: COLORS.border }} />}
         
         {canDelete && (
           <MenuItem onClick={() => { onDelete(item); onClose(); }} sx={{ py: 1.5 }}>
@@ -307,20 +302,9 @@ const HistoryModal = ({ open, onClose, so, historyData, loading }) => {
     });
   };
 
-  const getStepStatus = (action, status, index, historyLength, currentStatus) => {
-    if (action === 'created') return 'completed';
-    if (index === historyLength - 1) return 'active';
-    return 'completed';
-  };
-
-  // Helper to format action label without showing email
   const getActionLabel = (log) => {
-    if (log.action === 'created') {
-      return 'Order Created';
-    }
-    if (log.action === 'status_change') {
-      return `Status Changed to ${log.new_value}`;
-    }
+    if (log.action === 'created') return 'Order Created';
+    if (log.action === 'status_change') return `Status Changed to ${log.new_value}`;
     return log.action;
   };
 
@@ -378,7 +362,6 @@ const HistoryModal = ({ open, onClose, so, historyData, loading }) => {
           </Box>
         ) : (
           <Box sx={{ p: 2.5 }}>
-            {/* Current Status Badge */}
             <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
               <Chip
                 icon={so?.status === 'Confirmed' ? <CheckCircleIcon /> : so?.status === 'Cancelled' ? <CancelIcon /> : <PendingIcon />}
@@ -392,7 +375,6 @@ const HistoryModal = ({ open, onClose, so, historyData, loading }) => {
               />
             </Box>
 
-            {/* Stepper View */}
             <Stepper orientation="vertical" activeStep={historyData.length - 1}>
               {historyData.map((log, index) => {
                 const isLast = index === historyData.length - 1;
@@ -464,7 +446,6 @@ const HistoryModal = ({ open, onClose, so, historyData, loading }) => {
               })}
             </Stepper>
 
-            {/* Summary Card */}
             <Card sx={{ 
               mt: 3, 
               borderRadius: 1.5,
@@ -551,6 +532,7 @@ const SalesOrderMaster = () => {
   const [historyData, setHistoryData] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [acknowledgeLoading, setAcknowledgeLoading] = useState(false);
 
   // User permissions state
   const [userPermissions, setUserPermissions] = useState([]);
@@ -576,7 +558,6 @@ const SalesOrderMaster = () => {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
           
-          // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {
             setUserPermissions(userData.permissions);
           } else {
@@ -596,9 +577,7 @@ const SalesOrderMaster = () => {
 
   // Check permission helper
   const checkPermission = (action) => {
-    // Super admin has all permissions
     if (isSuperAdmin) return true;
-    
     return hasPermission(
       userPermissions,
       MODULES.SALES_ORDER_MASTER,
@@ -622,12 +601,10 @@ const SalesOrderMaster = () => {
     setSearchInput(value);
     isSearchingRef.current = true;
     
-    // Clear previous timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
     
-    // Set new timeout for debounce
     searchTimeoutRef.current = setTimeout(() => {
       setSearchTerm(value);
       setCurrentPage(1);
@@ -656,9 +633,8 @@ const SalesOrderMaster = () => {
     };
   }, []);
 
-  // Fetch Sales Orders from API - only if user has permission
+  // Fetch Sales Orders from API
   const fetchSalesOrders = useCallback(async () => {
-    // Don't show loading indicator while typing search and only if user has permission
     if (!canViewPage && !isSuperAdmin) return;
     
     if (!isSearchingRef.current) {
@@ -767,7 +743,8 @@ const SalesOrderMaster = () => {
       showNotification(`${selected.length} Sales Order(s) deleted successfully!`, 'success');
     } catch (err) {
       console.error('Bulk delete error:', err);
-      showNotification('Failed to delete Sales Orders', 'error');
+      const errorMessage = err.response?.data?.message || 'Failed to delete Sales Orders';
+      showNotification(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -789,7 +766,7 @@ const SalesOrderMaster = () => {
     showNotification('Sales Order deleted successfully!', 'success');
   };
   
-  // Handle Confirm API Call - Requires APPROVE permission
+  // Handle Confirm API Call
   const handleConfirm = async (so) => {
     if (!canApprove) {
       showNotification('You don\'t have permission to confirm orders', 'error');
@@ -819,7 +796,7 @@ const SalesOrderMaster = () => {
     }
   };
   
-  // Handle Regular Status Update - Requires UPDATE permission
+  // Handle Regular Status Update
   const handleStatusUpdate = async () => {
     if (!canUpdate) {
       showNotification('You don\'t have permission to update status', 'error');
@@ -854,7 +831,7 @@ const SalesOrderMaster = () => {
     }
   };
   
-  // Handle View History - Requires VIEW permission
+  // Handle View History
   const handleViewHistory = async (so) => {
     if (!canViewPage) return;
     
@@ -879,6 +856,60 @@ const SalesOrderMaster = () => {
       showNotification('Failed to load history', 'error');
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // Handle Print Acknowledgement (PDF Download)
+  const handleAcknowledge = async (so) => {
+    if (!canPrint && !isSuperAdmin) {
+      showNotification('You do not have permission to print acknowledgements', 'error');
+      return;
+    }
+
+    setAcknowledgeLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${BASE_URL}/api/sales-orders/${so._id}/acknowledge`,
+        {},
+        {
+          headers: { 'Authorization': `Bearer ${token}` },
+          responseType: 'blob' // Important for handling PDF files
+        }
+      );
+      
+      // Create a blob URL and trigger download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `SO_${so.so_number}_Acknowledgement.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      showNotification('Acknowledgement downloaded successfully!', 'success');
+      fetchSalesOrders(); // Refresh to update any UI changes
+    } catch (err) {
+      console.error('Error downloading acknowledgement:', err);
+      let errorMsg = 'Failed to download acknowledgement';
+      
+      // If the response is a blob, we need to read it as text to get the error message
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          errorMsg = json.message || errorMsg;
+        } catch (e) {
+          // If it's not JSON, ignore
+        }
+      } else {
+        errorMsg = err.response?.data?.message || errorMsg;
+      }
+      
+      showNotification(errorMsg, 'error');
+    } finally {
+      setAcknowledgeLoading(false);
     }
   };
   
@@ -991,12 +1022,10 @@ const SalesOrderMaster = () => {
     return SO_STATUS_TRANSITIONS[currentStatus] || [];
   };
 
-  // Show loading state while permissions are being fetched
   if (!permissionsLoaded) {
     return <LoadingState />;
   }
 
-  // If user doesn't have view permission, show access denied
   if (!canViewPage && !isSuperAdmin) {
     return <AccessDenied />;
   }
@@ -1032,7 +1061,6 @@ const SalesOrderMaster = () => {
         border: `1px solid ${COLORS.border}`
       }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center" justifyContent="space-between">
-          {/* Search */}
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1 }}>
             <TextField
               placeholder="Search by SO Number, Customer, or PO Number..."
@@ -1080,9 +1108,7 @@ const SalesOrderMaster = () => {
             />
           </Stack>
 
-          {/* Action Buttons - Conditionally rendered based on permissions */}
           <Stack direction="row" spacing={1.5} alignItems="center">
-            {/* Refresh Button - Available to all users with view permission */}
             <Tooltip title="Refresh">
               <IconButton
                 size="small"
@@ -1099,7 +1125,6 @@ const SalesOrderMaster = () => {
               </IconButton>
             </Tooltip>
             
-            {/* Bulk Delete Button - Only show if user has delete permission */}
             {canDelete && selected.length > 0 && (
               <Button
                 variant="outlined"
@@ -1125,7 +1150,6 @@ const SalesOrderMaster = () => {
               </Button>
             )}
             
-            {/* Add Sales Order Button - Only show if user has create permission */}
             {canCreate && (
               <Button
                 variant="contained"
@@ -1171,7 +1195,6 @@ const SalesOrderMaster = () => {
                   py: 1.5
                 }
               }}>
-                {/* Checkbox Column - Only show if user has delete permission */}
                 {canDelete && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
@@ -1271,7 +1294,6 @@ const SalesOrderMaster = () => {
                         }
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has delete permission */}
                       {canDelete && (
                         <TableCell padding="checkbox" sx={{ width: 40 }}>
                           <Checkbox
@@ -1375,7 +1397,9 @@ const SalesOrderMaster = () => {
                           onDelete={openDeleteSODialog}
                           onStatusUpdate={openStatusUpdateDialog}
                           onHistory={handleViewHistory}
+                          onAcknowledge={handleAcknowledge}
                           permissions={userPermissions}
+                          isSuperAdmin={isSuperAdmin}
                         />
                       </TableCell>
                     </TableRow>
@@ -1411,7 +1435,7 @@ const SalesOrderMaster = () => {
         />
       </Paper>
 
-      {/* Modal Components - Only render if user has appropriate permissions */}
+      {/* Modal Components */}
       {canCreate && (
         <AddSaleOrder 
           open={openAddModal}
@@ -1457,7 +1481,6 @@ const SalesOrderMaster = () => {
             />
           )}
 
-          {/* History Modal - Uses VIEW permission */}
           {canViewPage && (
             <HistoryModal
               open={openHistoryModal}
@@ -1472,7 +1495,6 @@ const SalesOrderMaster = () => {
             />
           )}
 
-          {/* Status Update Dialog */}
           {canUpdate && (
             <Dialog
               open={openStatusDialog}

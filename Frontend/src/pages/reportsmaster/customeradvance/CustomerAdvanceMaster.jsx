@@ -517,6 +517,11 @@ import {
   ListItemText,
   Alert,
   CircularProgress,
+  Dialog,           
+  DialogContent, 
+  DialogTitle ,   
+  DialogActions,    
+  Divider,
  
 } from '@mui/material';
 import {
@@ -532,6 +537,7 @@ import {
   Warning as WarningIcon,
   AccountBalance as AdvanceIcon,
   Receipt as ReceiptIcon,
+    Close as CloseIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import BASE_URL from '../../../config/Config';
@@ -600,7 +606,8 @@ const formatDate = (dateString) => {
 };
 
 // Action Menu Component - WITH PERMISSION CHECKS
-const ActionMenu = ({ record, anchorEl, onClose, onOpen, permissions, isSuperAdmin }) => {
+//const ActionMenu = ({ record, anchorEl, onClose, onOpen, permissions, isSuperAdmin }) => {
+  const ActionMenu = ({ record, onViewDetails, anchorEl, onClose, onOpen, permissions, isSuperAdmin }) => {
   const canView = isSuperAdmin || hasPermission(permissions, MODULES.CUSTOMER_ADVANCE, PAGES.CUSTOMER_ADVANCE, ACTIONS.VIEW);
 
   return (
@@ -612,12 +619,13 @@ const ActionMenu = ({ record, anchorEl, onClose, onOpen, permissions, isSuperAdm
       </Tooltip>
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={onClose} PaperProps={{ elevation: 3, sx: { mt: 1, minWidth: 180, borderRadius: 2, border: `1px solid ${COLORS.border}` } }}>
         {/* View Details - VIEW permission */}
-        {canView && (
-          <MenuItem onClick={onClose} sx={{ py: 1.5 }}>
-            <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><VisibilityIcon fontSize="small" /></ListItemIcon>
-            <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>View Details</Typography></ListItemText>
-          </MenuItem>
-        )}
+        {/* View Details - VIEW permission */}
+{canView && (
+  <MenuItem onClick={() => { onViewDetails(record); onClose(); }} sx={{ py: 1.5 }}>
+    <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}><VisibilityIcon fontSize="small" /></ListItemIcon>
+    <ListItemText><Typography sx={{ fontSize: '0.75rem' }}>View Details</Typography></ListItemText>
+  </MenuItem>
+)}
       </Menu>
     </>
   );
@@ -651,6 +659,8 @@ const CustomerAdvanceMaster = () => {
   
   // Modal state
   const [openAddModal, setOpenAddModal] = useState(false);
+  const [openViewDetailsDialog, setOpenViewDetailsDialog] = useState(false);   
+  const [selectedAdvance, setSelectedAdvance] = useState(null);    
   
   // Notification state
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -842,6 +852,16 @@ const CustomerAdvanceMaster = () => {
     fetchAdvances(); 
     showNotification('Customer advance created successfully!', 'success'); 
   };
+
+  const handleViewDetails = (advance) => {
+  if (!canViewPage) {
+    showNotification('You don\'t have permission to view details', 'error');
+    return;
+  }
+  setSelectedAdvance(advance);
+  setOpenViewDetailsDialog(true);
+  handleActionMenuClose();
+};
 
   const handleBulkDelete = async () => {
     if (!canDelete || selected.length === 0) return;
@@ -1052,6 +1072,7 @@ const CustomerAdvanceMaster = () => {
                       <TableCell align="center">
                         <ActionMenu 
                           record={advance} 
+                          onViewDetails={handleViewDetails} 
                           anchorEl={isActionMenuOpen ? actionMenuAnchor : null} 
                           onClose={handleActionMenuClose} 
                           onOpen={(e) => handleActionMenuOpen(e, advance)} 
@@ -1082,6 +1103,78 @@ const CustomerAdvanceMaster = () => {
       {canCreate && (
         <AddCustomerAdvance open={openAddModal} onClose={() => setOpenAddModal(false)} onSuccess={handleAddSuccess} />
       )}
+      
+
+<Dialog 
+  open={openViewDetailsDialog} 
+  onClose={() => { setOpenViewDetailsDialog(false); setSelectedAdvance(null); }} 
+  maxWidth="md" 
+  fullWidth
+>
+  <DialogTitle sx={{ borderBottom: `1px solid ${COLORS.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: COLORS.text.primary }}>
+      Customer Advance Details
+    </Typography>
+    <IconButton onClick={() => { setOpenViewDetailsDialog(false); setSelectedAdvance(null); }} size="small">
+      <CloseIcon fontSize="small" />
+    </IconButton>
+  </DialogTitle>
+  <DialogContent sx={{ p: 3 }}>
+    {selectedAdvance ? (
+      <Stack spacing={2}>
+        <Box>
+          <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Advance Number</Typography>
+          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: COLORS.primary }}>
+            {selectedAdvance.advance_no}
+          </Typography>
+        </Box>
+        <Divider />
+        <Stack direction="row" spacing={4}>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Date</Typography>
+            <Typography sx={{ fontSize: '0.85rem' }}>{formatDate(selectedAdvance.advance_date)}</Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Payment Mode</Typography>
+            <Typography sx={{ fontSize: '0.85rem' }}>{selectedAdvance.payment_mode}</Typography>
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={4}>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Customer</Typography>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>{selectedAdvance.customer_name}</Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Status</Typography>
+            <AdvanceStatusChip status={selectedAdvance.status || 'Open'} />
+          </Box>
+        </Stack>
+        <Divider />
+        <Box>
+          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+            <Typography sx={{ fontSize: '0.8rem' }}>Total Amount:</Typography>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>₹{formatCurrency(selectedAdvance.total_amount)}</Typography>
+          </Stack>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700 }}>Balance:</Typography>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: COLORS.primary }}>₹{formatCurrency(selectedAdvance.balance)}</Typography>
+          </Stack>
+        </Box>
+      </Stack>
+    ) : (
+      <Typography>No advance selected</Typography>
+    )}
+  </DialogContent>
+  <DialogActions sx={{ p: 2, borderTop: `1px solid ${COLORS.border}` }}>
+    <Button 
+      onClick={() => { setOpenViewDetailsDialog(false); setSelectedAdvance(null); }} 
+      variant="contained" 
+      sx={{ bgcolor: COLORS.primary }}
+    >
+      Close
+    </Button>
+  </DialogActions>
+</Dialog>
 
       <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled" sx={{ width: '100%', borderRadius: 1.5, fontSize: '0.75rem' }}>{snackbar.message}</Alert>

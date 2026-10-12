@@ -290,125 +290,36 @@ exports.deleteDefectCode = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
 // ======================================================
-// TOGGLE DEFECT CODE STATUS
-// PUT /api/defect-codes/:id/toggle-status
-// ======================================================
-exports.toggleDefectCodeStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const defectCode = await DefectCode.findById(id);
-
-    if (!defectCode) {
-      return res.status(404).json({
-        success: false,
-        message: 'Defect code not found'
-      });
-    }
-
-    defectCode.is_active = !defectCode.is_active;
-    defectCode.updated_by = req.user._id;
-
-    await defectCode.save();
-
-    return res.status(200).json({
-      success: true,
-      message: `Defect code ${defectCode.is_active ? 'activated' : 'deactivated'} successfully`,
-      data: defectCode
-    });
-
-  } catch (error) {
-    console.error('Toggle defect code status error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to toggle defect code status'
-    });
-  }
-};
-// ======================================================
-// BULK DELETE DEFECT CODES
+// BULK DELETE DEFECT CODES (Soft Delete)
 // POST /api/defect-codes/bulk-delete
-// Soft-deletes selected defect codes
 // ======================================================
-exports.bulkDeleteDefectCodes = async (req, res) => {
-  try {
-    const { ids } = req.body;
+// exports.bulkDeleteDefectCodes = async (req, res) => {
+//   try {
+//     const { ids } = req.body; // Frontend se array aayega: { ids: ["id1", "id2"] }
 
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide Defect Code IDs'
-      });
-    }
+//     if (!ids || !Array.isArray(ids) || ids.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Please provide an array of defect code IDs to delete',
+//       });
+//     }
 
-    const results = [];
-    let deletedCount = 0;
-    let failedCount = 0;
+//     // Soft delete: is_active ko false kar do
+//     const result = await DefectCode.updateMany(
+//       { _id: { $in: ids } },
+//       { is_active: false, updated_by: req.user._id }
+//     );
 
-    for (const id of ids) {
-      try {
-        const defectCode = await DefectCode.findByIdAndUpdate(
-          id,
-          {
-            is_active: false,
-            updated_by: req.user._id
-          },
-          {
-            new: true
-          }
-        );
+//     return res.status(200).json({
+//       success: true,
+//       message: `${result.modifiedCount} defect code(s) deactivated successfully`,
+//       data: { modifiedCount: result.modifiedCount },
+//     });
 
-        if (!defectCode) {
-          results.push({
-            id,
-            success: false,
-            message: 'Defect code not found'
-          });
-
-          failedCount++;
-          continue;
-        }
-
-        results.push({
-          id,
-          success: true,
-          message: `Defect code "${defectCode.defect_code}" deactivated`
-        });
-
-        deletedCount++;
-
-      } catch (error) {
-        console.error(
-          `[bulkDeleteDefectCodes] Error deleting ${id}:`,
-          error
-        );
-
-        results.push({
-          id,
-          success: false,
-          message: error.message || 'Failed to delete Defect Code'
-        });
-
-        failedCount++;
-      }
-    }
-
-    return res.status(200).json({
-      success: deletedCount > 0,
-      message: `${deletedCount} Defect Code(s) processed successfully, ${failedCount} failed`,
-      deletedCount,
-      failedCount,
-      results
-    });
-
-  } catch (error) {
-    console.error('[bulkDeleteDefectCodes] Error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to bulk delete Defect Codes'
-    });
-  }
-};
+//   } catch (error) {
+//     console.error('Bulk delete defect codes error:', error);
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
