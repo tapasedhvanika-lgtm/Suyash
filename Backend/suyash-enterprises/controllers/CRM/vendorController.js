@@ -2573,7 +2573,41 @@ exports.deleteVendor = async (req, res) => {
     });
   }
 };
+// ======================================================
+// BULK DELETE VENDORS
+// POST /api/vendors/bulk-delete
+// ======================================================
+exports.bulkDeleteVendors = async (req, res) => {
+  try {
+    const { ids } = req.body;
 
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide vendor IDs to delete'
+      });
+    }
+
+    const result = await Vendor.deleteMany({
+      _id: { $in: ids }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} vendor(s) deleted successfully!`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('Bulk delete vendors error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete vendors',
+      error: error.message
+    });
+  }
+};
 // ======================================================
 // GET VENDORS FOR DELIVERY CHALLAN DROPDOWN
 // GET /api/sales-orders/vendors

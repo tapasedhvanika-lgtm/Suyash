@@ -19,6 +19,7 @@ const { ppapGate } = require('../../middleware/Dispatch/ppapGate');
 router.post('/delivery-schedules', deliveryScheduleController.createDeliverySchedule);
 router.get('/delivery-schedules', deliveryScheduleController.listDeliverySchedules);
 router.put('/delivery-schedules/:id/confirm', deliveryScheduleController.confirmDeliverySchedule);
+router.delete('/delivery-schedules/:id', deliveryScheduleController.deleteDeliverySchedule);
 
 // ==================== DELIVERY CHALLAN ====================
 router.post('/delivery-challans', validateDC, ppapGate, deliveryChallanController.createDeliveryChallan);
