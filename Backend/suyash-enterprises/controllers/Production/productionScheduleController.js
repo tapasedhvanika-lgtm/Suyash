@@ -92,7 +92,7 @@ exports.createScheduleSlot = async (req, res) => {
     // STEP 2: Check for capacity overload (machine has enough hours)
     // ─────────────────────────────────────────────────────────────────────────
     const inputPlannedHours = planned_hours || 0;
-    
+
     // If planned_hours not provided, calculate from Work Order operation
     let effectivePlannedHours = inputPlannedHours;
     if (effectivePlannedHours === 0 && wo_id && operation_seq) {
@@ -114,8 +114,8 @@ exports.createScheduleSlot = async (req, res) => {
     }
 
     const capacityCheck = await checkMachineCapacity(
-      machine_id, 
-      new Date(scheduled_date), 
+      machine_id,
+      new Date(scheduled_date),
       effectivePlannedHours,
       null
     );
@@ -916,7 +916,7 @@ exports.listOeeRecords = async (req, res) => {
 exports.deleteOeeRecord = async (req, res) => {
   try {
     const oeeRecord = await OeeRecord.findById(req.params.id);
-    
+
     if (!oeeRecord) {
       return res.status(404).json({
         success: false,
@@ -928,7 +928,7 @@ exports.deleteOeeRecord = async (req, res) => {
     // Example: Can only delete records older than 30 days?
     const daysOld = (Date.now() - new Date(oeeRecord.date)) / (1000 * 60 * 60 * 24);
     const MAX_DELETE_DAYS = process.env.OEE_DELETE_DAYS || 90;
-    
+
     if (daysOld > MAX_DELETE_DAYS) {
       return res.status(400).json({
         success: false,
@@ -939,9 +939,9 @@ exports.deleteOeeRecord = async (req, res) => {
 
     // Check if this OEE record is referenced in any production reports
     // (Soft warning only - proceed with deletion)
-    
+
     const deletedRecord = await OeeRecord.findByIdAndDelete(req.params.id);
-    
+
     res.json({
       success: true,
       message: 'OEE Record deleted successfully',
@@ -955,6 +955,38 @@ exports.deleteOeeRecord = async (req, res) => {
 
   } catch (error) {
     console.error('Delete OEE Record error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// ✅ ADDED: Bulk Delete OEE Records
+// @desc    Bulk Delete OEE Records
+// @route   POST /api/oee-records/bulk-delete
+// @access  Admin, Manager
+exports.bulkDeleteOeeRecords = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No OEE record IDs provided for deletion.'
+      });
+    }
+
+    const result = await OeeRecord.deleteMany({ _id: { $in: ids } });
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} OEE record(s) permanently deleted successfully.`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('Bulk Delete OEE error:', error);
     res.status(500).json({
       success: false,
       message: error.message

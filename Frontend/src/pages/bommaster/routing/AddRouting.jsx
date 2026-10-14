@@ -1206,19 +1206,19 @@
 //                                                     <TableCell sx={{ fontSize: '0.7rem' }}>{op.planned_run_min}</TableCell>
 //                                                     <TableCell sx={{ fontSize: '0.7rem' }}>
 //                                                         {op.requires_torque_recording ? (
-//                                                             <Chip 
-//                                                                 label="Yes" 
-//                                                                 size="small" 
-//                                                                 sx={{ fontSize: '0.6rem', height: 20, bgcolor: COLORS.primary, color: '#fff' }} 
+//                                                             <Chip
+//                                                                 label="Yes"
+//                                                                 size="small"
+//                                                                 sx={{ fontSize: '0.6rem', height: 20, bgcolor: COLORS.primary, color: '#fff' }}
 //                                                             />
 //                                                         ) : '-'}
 //                                                     </TableCell>
 //                                                     <TableCell sx={{ fontSize: '0.7rem' }}>
 //                                                         {op.requires_functional_test ? (
-//                                                             <Chip 
-//                                                                 label="Yes" 
-//                                                                 size="small" 
-//                                                                 sx={{ fontSize: '0.6rem', height: 20, bgcolor: COLORS.success, color: '#fff' }} 
+//                                                             <Chip
+//                                                                 label="Yes"
+//                                                                 size="small"
+//                                                                 sx={{ fontSize: '0.6rem', height: 20, bgcolor: COLORS.success, color: '#fff' }}
 //                                                             />
 //                                                         ) : '-'}
 //                                                     </TableCell>
@@ -1550,8 +1550,6 @@
 
 // export default AddRouting;
 
-
-
 import React, { useState, useEffect } from 'react';
 import {
     Box,
@@ -1567,7 +1565,6 @@ import {
     Paper,
     IconButton,
     FormControl,
-    InputLabel,
     Select,
     MenuItem,
     Alert,
@@ -1577,7 +1574,6 @@ import {
     StepConnector,
     stepConnectorClasses,
     styled,
-    Divider,
     Chip,
     Table,
     TableBody,
@@ -1585,7 +1581,6 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Tooltip,
     Autocomplete,
     InputAdornment,
     FormControlLabel,
@@ -1603,7 +1598,6 @@ import {
     Delete as DeleteIcon,
     Search as SearchIcon,
     Science as ScienceIcon,
-    CheckCircle as CheckCircleIcon,
     Bolt as BoltIcon
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -1938,7 +1932,7 @@ const AddRouting = ({ open, onClose, onAdd }) => {
         }
     };
 
-    // --- Inline process form (unchanged) ---
+    // --- Inline process form ---
     const [showAddProcessForm, setShowAddProcessForm] = useState(false);
     const [processFormData, setProcessFormData] = useState({
         process_id: '',
@@ -1957,8 +1951,9 @@ const AddRouting = ({ open, onClose, onAdd }) => {
     const [addProcessLoading, setAddProcessLoading] = useState(false);
     const [addProcessError, setAddProcessError] = useState('');
 
-    const categoryOptions = ['Core', 'Support', 'Internal', 'External'];
-    const rateTypeOptions = ['Per Hour', 'Per Piece', 'Per Minute'];
+    // ✅ FIX: Updated to match backend enums in Process.js
+    const categoryOptions = ['Core', 'Finishing', 'Packing', 'Other'];
+    const rateTypeOptions = ['Per Kg', 'Per Nos', 'Per Hour', 'Fixed'];
 
     const validateProcessField = (name, value) => {
         switch (name) {
@@ -1977,7 +1972,8 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                 if (!value) return 'Rate Type is required';
                 return '';
             case 'work_centre':
-                if (!value?.trim()) return 'Work Centre is required';
+                if (!value) return 'Work Centre is required';
+                if (typeof value === 'string' && !value.trim()) return 'Work Centre is required';
                 return '';
             case 'setup_time_min':
                 if (value && (isNaN(value) || parseFloat(value) < 0)) return 'Setup time must be non-negative';
@@ -2071,7 +2067,10 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                 process_name: processFormData.process_name,
                 category: processFormData.category,
                 rate_type: processFormData.rate_type,
-                work_centre: processFormData.work_centre,
+                // Safely handle object or string
+                work_centre: typeof processFormData.work_centre === 'object'
+                    ? (processFormData.work_centre?.name || processFormData.work_centre?._id || '')
+                    : processFormData.work_centre,
                 setup_time_min: processFormData.setup_time_min ? parseFloat(processFormData.setup_time_min) : 0,
                 cycle_time_min: processFormData.cycle_time_min ? parseFloat(processFormData.cycle_time_min) : 0,
                 description: processFormData.description || '',
@@ -2098,7 +2097,9 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                     ...prev,
                     operation_id: newProcess._id,
                     operation_name: newProcess.process_name,
-                    work_centre: newProcess.work_centre || ''
+                    work_centre: typeof newProcess.work_centre === 'object'
+                        ? (newProcess.work_centre?.name || '')
+                        : (newProcess.work_centre || '')
                 }));
                 setShowAddProcessForm(false);
                 resetProcessForm();
@@ -2212,7 +2213,6 @@ const AddRouting = ({ open, onClose, onAdd }) => {
     const fetchItems = async () => {
         try {
             const token = localStorage.getItem('token');
-            // Fetch full item list to get all fields
             const response = await axios.get(`${BASE_URL}/api/items`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -2250,10 +2250,14 @@ const AddRouting = ({ open, onClose, onAdd }) => {
     const handleMachineSelect = (machineId) => {
         const selectedMachine = machines.find(m => m._id === machineId);
         if (selectedMachine) {
+            const workCentreVal = typeof selectedMachine.work_centre === 'object'
+                ? (selectedMachine.work_centre?.name || selectedMachine.work_centre?.code || '')
+                : (selectedMachine.work_centre || '');
+
             setCurrentOperation(prev => ({
                 ...prev,
                 machine_id: selectedMachine._id,
-                work_centre: selectedMachine.work_centre || prev.work_centre
+                work_centre: workCentreVal || prev.work_centre
             }));
         }
     };
@@ -3194,7 +3198,7 @@ const AddRouting = ({ open, onClose, onAdd }) => {
         </Box>
     );
 
-    // --- Render inline process form (unchanged) ---
+    // --- Render inline process form ---
     const renderInlineProcessForm = () => (
         <Box sx={{ mt: 2, p: 2, bgcolor: COLORS.background.light, borderRadius: 2, border: `1px solid ${COLORS.primary}` }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -3298,7 +3302,9 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                         <Typography sx={labelStyle}>WORK CENTRE <span style={{ color: '#EF4444' }}>*</span></Typography>
                         <TextField
                             fullWidth size="small" name="work_centre"
-                            value={processFormData.work_centre}
+                            value={typeof processFormData.work_centre === 'object'
+                                ? (processFormData.work_centre?.name || processFormData.work_centre?._id || '')
+                                : (processFormData.work_centre || '')}
                             onChange={handleProcessFormChange}
                             onBlur={handleProcessBlur}
                             placeholder="Enter work centre"
@@ -3520,9 +3526,7 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                                                     }}
                                                     onChange={(event, newValue) => {
                                                         if (newValue) {
-                                                            // Add to routing
                                                             addApplicableItem(newValue);
-                                                            // Populate all fields in the inline form
                                                             setItemFormData({
                                                                 part_no: newValue.part_no || '',
                                                                 part_name: newValue.part_name || '',
@@ -3681,18 +3685,22 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                                                     }
                                                     onChange={(event, newValue) => {
                                                         if (newValue) {
+                                                            const workCentreVal = typeof newValue.work_centre === 'object'
+                                                                ? (newValue.work_centre?.name || newValue.work_centre?.code || '')
+                                                                : (newValue.work_centre || '');
+
                                                             setCurrentOperation(prev => ({
                                                                 ...prev,
                                                                 operation_id: newValue._id,
                                                                 operation_name: newValue.process_name,
-                                                                work_centre: newValue.work_centre || ''
+                                                                work_centre: workCentreVal
                                                             }));
                                                             setProcessFormData({
                                                                 process_id: newValue.process_id || '',
                                                                 process_name: newValue.process_name || '',
                                                                 category: newValue.category || '',
                                                                 rate_type: newValue.rate_type || '',
-                                                                work_centre: newValue.work_centre || '',
+                                                                work_centre: workCentreVal,
                                                                 setup_time_min: newValue.setup_time_min || '',
                                                                 cycle_time_min: newValue.cycle_time_min || '',
                                                                 description: newValue.description || '',
@@ -3810,7 +3818,6 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                                             onChange={handleOperationChange}
                                             placeholder="Enter work centre"
                                             sx={inputStyle}
-                                            disabled
                                         />
                                     </Box>
                                 </Grid>
@@ -4401,7 +4408,6 @@ const AddRouting = ({ open, onClose, onAdd }) => {
                 </Box>
             </DialogActions>
 
-            {/* Remaining modals: Machine, Vendor */}
             <AddMachine
                 open={openAddMachineModal}
                 onClose={() => setOpenAddMachineModal(false)}

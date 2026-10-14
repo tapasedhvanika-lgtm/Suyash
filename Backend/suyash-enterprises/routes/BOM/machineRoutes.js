@@ -7,12 +7,23 @@ const {
   getMachineById,
   updateMachine,
   updateMachineStatus,
-  getCapacityReport
+  getCapacityReport,
+  deleteMachine,
+  bulkDeleteMachines // ✅ Imported the bulk delete function
 } = require('../../controllers/BOM/machineController');
 const { protect } = require('../../middleware/authMiddleware');
 
-// All routes require authentication (but role checks inside controllers)
+// All routes require authentication
 router.use(protect);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ BULK DELETE ROUTE (MUST BE FIRST!)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/bulk-delete', bulkDeleteMachines);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SWAGGER DOCUMENTATION & ROUTES
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * @swagger
@@ -861,5 +872,45 @@ router.put('/:id', updateMachine);
  *           last_maintenance_date: "2026-01-22"
  */
 router.put('/:id/status', updateMachineStatus);
+
+/**
+ * @swagger
+ * /api/machines/{id}:
+ *   delete:
+ *     summary: Delete a machine (Admin/Manager only)
+ *     tags: [Machine Master]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Machine ObjectId
+ *     responses:
+ *       200:
+ *         description: Machine deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Machine MCH-000015 (Minster 80T Progressive Press) has been deleted successfully."
+ *       404:
+ *         $ref: '#/components/responses/MachineNotFound'
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         $ref: '#/components/responses/InsufficientPermissions'
+ *       500:
+ *         description: Server error
+ */
+router.delete('/:id', deleteMachine);
 
 module.exports = router;

@@ -3,15 +3,17 @@
 // controllers/Production/mrpController.js
 // Phase 05 — BE-018
 // UPDATED: Added missing mongoose import (needed for deleteMrpRun)
+// UPDATED: Added fallback handling in triggerMrpRun (works without Redis)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const mongoose = require('mongoose'); // ✅ Added missing import
+const mongoose = require('mongoose');
 const { MrpRun } = require('../../models/Production/MrpRun');
 const { enqueueMrpRun, getJobStatus } = require('../../services/Production/mrpQueue');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/mrp/run
 // Trigger an MRP run — returns job_id immediately (non-blocking)
+// Falls back to in-process mode if Redis is unavailable
 // ─────────────────────────────────────────────────────────────────────────────
 exports.triggerMrpRun = async (req, res) => {
   try {
@@ -44,14 +46,36 @@ exports.triggerMrpRun = async (req, res) => {
     });
 
     let jobId;
+    let isFallback = false;
+
     try {
-      ({ jobId } = await enqueueMrpRun(String(run._id)));
+      const queueResult = await enqueueMrpRun(String(run._id));
+      jobId = queueResult.jobId;
+      isFallback = queueResult.fallback || false;
     } catch (queueErr) {
-      console.error('[MRP] enqueueMrpRun failed, Redis unreachable:', queueErr.message);
-      await MrpRun.deleteOne({ _id: run._id });   // remove orphaned Queued run
-      return res.status(503).json({
-        success: false,
-        message: 'MRP queue is unavailable. Redis connection failed — check queue service.',
+      // ✅ FIX: Instead of returning 503, fall back to in-process mode
+      console.warn('[MRP] ⚠️ Queue unavailable, falling back to in-process mode...');
+      console.warn('[MRP] Reason:', queueErr.message);
+
+      isFallback = true;
+      jobId = `fallback-${Date.now()}`;
+
+      // Fire-and-forget: run MRP directly in background
+      setImmediate(async () => {
+        try {
+          await MrpRun.findByIdAndUpdate(run._id, { status: 'Running' });
+          const { runMrpJob } = require('../../services/Production/mrpService');
+          await runMrpJob(String(run._id), null); // null bullJob → no progress tracking
+          console.log(`[MRP] ✓ Fallback job completed — MRP Run ${run._id}`);
+        } catch (fallbackErr) {
+          console.error('[MRP] ✗ Fallback job failed:', fallbackErr.message);
+          try {
+            await MrpRun.findByIdAndUpdate(run._id, {
+              status: 'Failed',
+              log: `FALLBACK MODE FAILURE: ${fallbackErr.message}`,
+            });
+          } catch (_) {}
+        }
       });
     }
 
@@ -60,7 +84,9 @@ exports.triggerMrpRun = async (req, res) => {
 
     return res.status(202).json({
       success: true,
-      message: 'MRP Run queued. Poll /api/mrp/runs/:id/status for progress.',
+      message: isFallback
+        ? 'MRP Run started in fallback mode (Redis unavailable). Poll /api/mrp/runs/:id/status for progress.'
+        : 'MRP Run queued. Poll /api/mrp/runs/:id/status for progress.',
       data: {
         mrp_run_id: run.mrp_run_id,
         _id: run._id,
@@ -68,6 +94,7 @@ exports.triggerMrpRun = async (req, res) => {
         run_type,
         planning_horizon,
         status: 'Queued',
+        fallback: isFallback, // ✅ Let frontend know it's in fallback mode
       },
     });
   } catch (err) {
@@ -204,18 +231,18 @@ exports.getMrpRunStatus = async (req, res) => {
 exports.deleteMrpRun = async (req, res) => {
   try {
     const run = await MrpRun.findById(req.params.id);
-    
+
     if (!run) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'MRP Run not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'MRP Run not found'
       });
     }
 
     if (run.status === 'Running' || run.status === 'Queued') {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Cannot delete MRP run with status '${run.status}'. Please wait for completion or cancel the job first.` 
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete MRP run with status '${run.status}'. Please wait for completion or cancel the job first.`
       });
     }
 
@@ -225,7 +252,7 @@ exports.deleteMrpRun = async (req, res) => {
         _id: { $in: run.pr_generated },
         status: { $in: ['Approved', 'Ordered', 'Partially Received'] }
       });
-      
+
       if (prs.length > 0) {
         return res.status(409).json({
           success: false,
@@ -240,7 +267,7 @@ exports.deleteMrpRun = async (req, res) => {
         _id: { $in: run.wo_generated },
         status: { $in: ['Released', 'In Progress', 'Completed'] }
       });
-      
+
       if (wos.length > 0) {
         return res.status(409).json({
           success: false,
