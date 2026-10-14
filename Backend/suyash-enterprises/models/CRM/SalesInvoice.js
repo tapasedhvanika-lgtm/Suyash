@@ -24,7 +24,8 @@ require('./InvoiceIdCounter');
 // INVOICE STATUS MACHINE
 // ─────────────────────────────────────────────────────────────────────────────
 const INVOICE_STATUS_TRANSITIONS = {
-  'Draft':     ['Submitted', 'Cancelled'],
+  'Draft':     ['Issued','Submitted', 'Cancelled'],
+   'Issued':    ['Submitted', 'Sent', 'Cancelled'], 
   'Submitted': ['Sent', 'Cancelled'],
   'Sent':      ['Partially Paid', 'Fully Paid', 'Overdue'],
   'Partially Paid': ['Fully Paid', 'Overdue'],

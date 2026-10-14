@@ -500,6 +500,7 @@ const {
   createVendor,
   updateVendor,
   deleteVendor,
+  bulkDeleteVendors,
   getVendorsDropdown,
   
   // AVL & Blacklist
@@ -1286,6 +1287,12 @@ router.use(protect);
  *       500:
  *         description: Server error
  */
+router.post(
+  '/bulk-delete',
+  protect,
+  authorize('admin'),
+  bulkDeleteVendors
+);
 router.get('/', protect, getAllVendors);
 
 /**

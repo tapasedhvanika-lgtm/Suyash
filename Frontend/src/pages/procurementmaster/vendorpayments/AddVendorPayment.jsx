@@ -644,7 +644,14 @@ const AddVendorPayment = ({ open, onClose, onAdd }) => {
                     </TableHead>
                     <TableBody>
                       {invoices
-                        .filter(inv => inv.vendor_id?._id === selectedVendor._id && inv.payment_status !== 'Paid')
+                       
+.filter(inv =>
+  (inv.vendor_id?._id || inv.vendor_id) === selectedVendor._id &&
+  ['Unpaid', 'Partially Paid', 'Overdue'].includes(inv.payment_status) &&
+  inv.status === 'Approved' &&
+  (inv.balance_due ?? inv.grand_total) > 0
+)
+
                         .map((invoice) => (
                           <TableRow key={invoice._id} hover>
                             <TableCell sx={{ fontSize: '0.75rem' }}>

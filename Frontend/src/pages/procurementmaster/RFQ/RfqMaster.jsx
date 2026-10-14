@@ -1300,10 +1300,16 @@ const StatusChip = ({ status }) => {
 const ActionMenu = ({ item, onView, onSend, onSubmitQuote, onCompare, onCloseRfq, onClose, anchorEl, onOpen, sendingRfqId, permissions, isSuperAdmin }) => {
 const canView = isSuperAdmin || hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.VIEW);
 const canUpdate = isSuperAdmin || hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.UPDATE);
+console.log("RFQ ACTION DEBUG:", {
+  status: item.status,
+  isSuperAdmin,
+  canUpdate
+});
 const canReject = isSuperAdmin || hasPermission(permissions, MODULES.RFQ_MASTER, PAGES.RFQ_MASTER, ACTIONS.REJECT);
   
 // Status-based action availability with permission checks - using backend statuses
-  const canSend = item.status === 'Pending' && canUpdate;
+// const canSend = item.status === 'Pending' && canUpdate;
+  const canSend = (item.status === 'Draft' || item.status === 'Pending') && canUpdate;
   const canSubmitQuote = (item.status === 'Sent' || item.status === 'Partially Responded') && canUpdate;
   const canCompare = (item.status === 'Fully Responded' || item.status === 'Partially Responded') && canView;
   const canClose = item.status === 'Compared' && canReject;
@@ -1469,6 +1475,8 @@ const RFQMaster = () => {
         if (response.data.success) {
           const userData = response.data.data;
           setIsSuperAdmin(userData.isSuperAdmin || false);
+          console.log("USER DATA:", userData);
+          console.log("IS SUPER ADMIN:", userData.isSuperAdmin);
           
           // Set permissions array
           if (userData.permissions && Array.isArray(userData.permissions)) {

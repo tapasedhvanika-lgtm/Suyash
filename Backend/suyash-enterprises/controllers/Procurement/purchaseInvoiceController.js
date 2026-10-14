@@ -555,6 +555,14 @@ exports.getAllPurchaseInvoices = async (req, res) => {
       .populate('vendor_id', 'vendor_name vendor_code')
       .populate('po_id', 'po_number')
       .populate('created_by', 'Username Email');
+      console.log('Approved invoices:', invoices.map(inv => ({
+  invoice: inv.purchase_invoice_number,
+  vendor: inv.vendor_name,
+  vendor_id: inv.vendor_id?._id || inv.vendor_id,
+  status: inv.status,
+  payment_status: inv.payment_status,
+  balance_due: inv.balance_due
+})));
     
     const total = await PurchaseInvoice.countDocuments(filter);
     
@@ -642,6 +650,76 @@ exports.getPurchaseInvoiceById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch invoice',
+      error: error.message
+    });
+  }
+};
+
+exports.bulkDeletePurchaseInvoices = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide invoice IDs to delete'
+      });
+    }
+
+    if (!ids.every(id => require('mongoose').Types.ObjectId.isValid(id))) {
+      return res.status(400).json({
+        success: false,
+        message: 'One or more invoice IDs are invalid'
+      });
+    }
+
+    const invoices = await PurchaseInvoice.find({
+      _id: { $in: ids }
+    });
+
+    if (invoices.length !== ids.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'One or more invoices were not found'
+      });
+    }
+    console.log('Invoice delete check:', invoices.map(invoice => ({
+  invoice_number: invoice.purchase_invoice_number,
+  status: invoice.status,
+  paid_amount: invoice.paid_amount,
+  payment_status: invoice.payment_status
+})));
+
+  
+const blocked = invoices.filter(invoice =>
+  invoice.status !== 'Pending' ||
+  (invoice.paid_amount || 0) > 0
+);
+
+    if (blocked.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only Pending, unpaid invoices can be deleted.',
+        blockedInvoices: blocked.map(
+          invoice => invoice.purchase_invoice_number
+        )
+      });
+    }
+
+    await PurchaseInvoice.deleteMany({
+      _id: { $in: invoices.map(invoice => invoice._id) }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Purchase invoices deleted successfully',
+      deletedCount: invoices.length
+    });
+  } catch (error) {
+    console.error('Bulk delete purchase invoices error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete purchase invoices',
       error: error.message
     });
   }
