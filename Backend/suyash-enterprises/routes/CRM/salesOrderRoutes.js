@@ -21,7 +21,7 @@ const { protect } = require('../../middleware/authMiddleware');
 const {
   uploadPoFile,
   createSalesOrder,
-  deleteSalesOrder, 
+  deleteSalesOrder,
   bulkDeleteSalesOrders,
   getSalesOrders,
   getSalesOrderById,
@@ -726,7 +726,7 @@ router.delete('/:id', deleteSalesOrder);
  *     description: |
  *       Changes the status of a Sales Order based on allowed transitions.
  *       Valid transitions are defined in SO_STATUS_TRANSITIONS.
- *       
+ *
  *       Allowed transitions:
  *       - Draft → Confirmed, Cancelled
  *       - Confirmed → In Production, Cancelled
@@ -734,7 +734,7 @@ router.delete('/:id', deleteSalesOrder);
  *       - Ready for Dispatch → Partially Delivered, Fully Delivered
  *       - Partially Delivered → Fully Delivered, Cancelled
  *       - Fully Delivered → Closed
- *       
+ *
  *       Additional validations:
  *       - 'Ready for Dispatch' requires all items to have committed_date
  *       - 'Fully Delivered' requires all items to be delivered
@@ -789,5 +789,4 @@ router.delete('/:id', deleteSalesOrder);
  *         description: Sales Order not found
  */
 router.put('/:id/status', updateSalesOrderStatus);
-
 module.exports = router;

@@ -11,7 +11,8 @@ const {
   getMachineLoading,
   recordToolUsage,
   listToolUsage,
-  deleteOeeRecord
+  deleteOeeRecord,
+  bulkDeleteOeeRecords // ✅ Added the bulk delete function here
 } = require('../../controllers/Production/productionScheduleController');
 
 // All OEE routes require authentication
@@ -166,6 +167,10 @@ router.get('/oee-records', listOeeRecords);
  */
 router.post('/oee-records', authorize('manager', 'production'), createOeeRecord);
 
+// ✅ ADDED: Bulk Delete OEE Records Route
+// MUST be placed before /oee-records/:id to avoid Express treating "bulk-delete" as an ID
+router.post('/oee-records/bulk-delete', authorize('admin', 'manager'), bulkDeleteOeeRecords);
+
 /**
  * @swagger
  * /api/oee-records/{id}:
@@ -299,7 +304,6 @@ router.get('/tool-usage', listToolUsage);
  *             required:
  *               - tool_id
  *               - wo_id
- * 
  *               - operation_seq
  *               - shots_fired
  *             properties:
@@ -324,7 +328,6 @@ router.get('/tool-usage', listToolUsage);
  *         description: Tool usage recorded. Alert if near maintenance threshold.
  */
 router.post('/tool-usage', authorize('admin', 'manager', 'production', 'operator'), recordToolUsage);
-
 
 /**
  * @swagger
