@@ -2289,8 +2289,7 @@
 
 
 
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -2315,7 +2314,6 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  Divider,
   Alert,
   CircularProgress,
   Dialog,
@@ -2323,7 +2321,6 @@ import {
   DialogContent,
   DialogActions,
   FormControl,
-  InputLabel,
   Select,
   Grid,
   Card,
@@ -2331,13 +2328,10 @@ import {
   Stepper,
   Step,
   StepLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Tab,
   Tabs,
-  Paper as MuiPaper
-  // ✅ Close removed from here
+  Paper as MuiPaper,
+  Divider
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -2346,26 +2340,18 @@ import {
   MoreVert as MoreVertIcon,
   History as HistoryIcon,
   Edit as EditIcon,
-  Send as SendIcon,
-  Download as DownloadIcon,
   Email as EmailIcon,
-  ExpandMore as ExpandMoreIcon,
   Receipt as ReceiptIcon,
   Business as BusinessIcon,
   LocalShipping as ShippingIcon,
-  Payment as PaymentIcon,
-  CalendarToday as CalendarIcon,
   AttachMoney as MoneyIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Warning as WarningIcon,
-  Close as CloseIcon  // ✅ This is correct - from @mui/icons-material
+  Close as CloseIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import BASE_URL from '../../../config/Config';
 import { hasPermission, ACTIONS, MODULES, PAGES } from '../../../utils/modulePermissions';
 import { COLORS } from './constants';
-import { InfoIcon } from 'lucide-react';
 
 // Status colors
 const STATUS_COLORS = {
@@ -2381,7 +2367,6 @@ const STATUS_COLORS = {
 
 const DELIVERY_TERMS_OPTIONS = ['Ex-Works', 'FOR Destination', 'CIF', 'FOB', ''];
 const PAYMENT_TERMS_OPTIONS = ['Net 30', 'Net 60', 'Net 90', 'Advance', 'LC', ''];
-const CURRENCY_OPTIONS = ['INR', 'USD', 'EUR', 'GBP', 'AED'];
 
 // Loading state component
 const LoadingState = () => (
@@ -2770,6 +2755,9 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
       setPaymentTerms(order.payment_terms || '');
       setDeliveryTerms(order.delivery_terms || '');
       setInternalRemarks(order.internal_remarks || '');
+      setReason('');
+      setActiveStep(0);
+      setFieldErrors({});
     }
   }, [order, open]);
   
@@ -2790,8 +2778,8 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
     
     switch (step) {
       case 0:
-        if (!reason.trim()) {
-          errors.reason = 'Please provide a reason for revision';
+        if (!reason.trim() || reason.trim().length < 5) {
+          errors.reason = 'Please provide a reason (min 5 characters)';
           isValid = false;
         }
         break;
@@ -2802,7 +2790,11 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
         }
         for (let i = 0; i < items.length; i++) {
           if (!items[i].ordered_qty || items[i].ordered_qty <= 0) {
-            errors[`item_${i}_qty`] = `Item ${i + 1}: Quantity is required`;
+            errors[`item_${i}_qty`] = `Item ${i + 1}: Quantity must be > 0`;
+            isValid = false;
+          }
+          if (items[i].unit_price < 0) {
+            errors[`item_${i}_price`] = `Item ${i + 1}: Price cannot be negative`;
             isValid = false;
           }
         }
@@ -2866,7 +2858,7 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
       }
     } catch (err) {
       console.error('Error revising order:', err);
-      alert('Failed to revise order. Please try again.');
+      alert(err.response?.data?.message || 'Failed to revise order. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -2878,15 +2870,6 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
       currency: order?.currency || 'INR',
       minimumFractionDigits: 2
     }).format(amount || 0);
-  };
-  
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
   };
   
   const renderStepContent = (step) => {
@@ -2926,6 +2909,7 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="Please provide the reason for revising this order (e.g., quantity change, price adjustment, delivery date change)..."
                   error={!!fieldErrors.reason}
+                  helperText={fieldErrors.reason}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 1.5,
@@ -2946,11 +2930,6 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
                     }
                   }}
                 />
-                {fieldErrors.reason && (
-                  <Typography sx={{ fontSize: '0.65rem', color: '#EF4444', mt: 0.5 }}>
-                    {fieldErrors.reason}
-                  </Typography>
-                )}
               </Box>
               
               <Box>
@@ -3211,6 +3190,8 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
                           value={item.ordered_qty}
                           onChange={(e) => handleItemChange(idx, 'ordered_qty', e.target.value)}
                           size="small"
+                          error={!!fieldErrors[`item_${idx}_qty`]}
+                          helperText={fieldErrors[`item_${idx}_qty`]}
                           sx={{ width: 90 }}
                           InputProps={{
                             sx: { fontSize: '0.7rem', height: 32 }
@@ -3221,11 +3202,6 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
                             Original: {item.original_qty}
                           </Typography>
                         )}
-                        {fieldErrors[`item_${idx}_qty`] && (
-                          <Typography sx={{ fontSize: '0.6rem', color: '#EF4444' }}>
-                            {fieldErrors[`item_${idx}_qty`]}
-                          </Typography>
-                        )}
                       </TableCell>
                       <TableCell sx={{ fontSize: '0.7rem' }} align="right">
                         <TextField
@@ -3233,6 +3209,8 @@ const ReviseOrderDialog = ({ open, onClose, order, onReviseComplete, permissions
                           value={item.unit_price}
                           onChange={(e) => handleItemChange(idx, 'unit_price', e.target.value)}
                           size="small"
+                          error={!!fieldErrors[`item_${idx}_price`]}
+                          helperText={fieldErrors[`item_${idx}_price`]}
                           sx={{ width: 100 }}
                           InputProps={{
                             sx: { fontSize: '0.7rem', height: 32 }
@@ -4073,13 +4051,12 @@ const ViewOrderModal = ({ open, onClose, order }) => {
 };
 
 const SORevise = () => {
-  const [salesOrders, setSalesOrders] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalItems, setTotalItems] = useState(0);
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedSOForAction, setSelectedSOForAction] = useState(null);
   const [selectedSO, setSelectedSO] = useState(null);
@@ -4099,8 +4076,7 @@ const SORevise = () => {
   const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   // Ref for search debouncing
-  const isSearchingRef = React.useRef(false);
-  const searchTimeoutRef = React.useRef(null);
+  const searchTimeoutRef = useRef(null);
 
   // Fetch user permissions
   useEffect(() => {
@@ -4127,7 +4103,7 @@ const SORevise = () => {
     fetchUserPermissions();
   }, []);
 
-  // Check permission helper - USING CORRECT MODULE AND PAGE
+  // Check permission helper
   const checkPermission = (action) => {
     if (isSuperAdmin) return true;
     return hasPermission(
@@ -4145,7 +4121,6 @@ const SORevise = () => {
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
-    isSearchingRef.current = true;
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -4154,7 +4129,6 @@ const SORevise = () => {
     searchTimeoutRef.current = setTimeout(() => {
       setSearchTerm(value);
       setPage(0);
-      isSearchingRef.current = false;
     }, 500);
   };
 
@@ -4163,7 +4137,6 @@ const SORevise = () => {
     setSearchInput('');
     setSearchTerm('');
     setPage(0);
-    isSearchingRef.current = false;
   };
 
   // Cleanup timeout on unmount
@@ -4175,34 +4148,28 @@ const SORevise = () => {
     };
   }, []);
 
-  // Fetch Sales Orders from API
+  // Fetch Sales Orders from API (fetch all eligible, filter client-side)
   const fetchSalesOrders = useCallback(async () => {
     if (!canViewPage && !isSuperAdmin) return;
 
-    if (!isSearchingRef.current) {
-      setLoading(true);
-    }
+    setLoading(true);
 
     try {
       const token = localStorage.getItem('token');
       
+      // Fetch up to 100 orders that are eligible for revision
       const params = new URLSearchParams({
-        page: page + 1,
-        limit: rowsPerPage,
+        page: 1,
+        limit: 100,
         status: 'Confirmed,In Production'
       });
-      
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
       
       const response = await axios.get(`${BASE_URL}/api/sales-orders?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.data.success) {
-        setSalesOrders(response.data.data || []);
-        setTotalItems(response.data.pagination.total);
+        setAllOrders(response.data.data || []);
       } else {
         showNotification('Failed to load Sales Orders', 'error');
       }
@@ -4212,7 +4179,7 @@ const SORevise = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, searchTerm, canViewPage, isSuperAdmin]);
+  }, [canViewPage, isSuperAdmin]);
 
   useEffect(() => {
     if (permissionsLoaded && (canViewPage || isSuperAdmin)) {
@@ -4220,6 +4187,26 @@ const SORevise = () => {
     }
   }, [fetchSalesOrders, permissionsLoaded, canViewPage, isSuperAdmin]);
 
+  // --- Client-side Filtering and Pagination ---
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm) return allOrders;
+    const lowerSearch = searchTerm.toLowerCase();
+    return allOrders.filter(so => 
+      so.so_number?.toLowerCase().includes(lowerSearch) ||
+      so.customer_name?.toLowerCase().includes(lowerSearch) ||
+      so.customer_po_number?.toLowerCase().includes(lowerSearch) ||
+      so.quotation_no?.toLowerCase().includes(lowerSearch)
+    );
+  }, [allOrders, searchTerm]);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return filteredOrders.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredOrders, page, rowsPerPage]);
+
+  const totalItems = filteredOrders.length;
+
+  // --- Handlers ---
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
   };
@@ -4457,7 +4444,7 @@ const SORevise = () => {
           {/* Stats */}
           <Stack direction="row" spacing={2} alignItems="center">
             <Typography variant="caption" sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>
-              Showing {salesOrders.length} of {totalItems} orders eligible for revision
+              Showing {paginatedOrders.length} of {totalItems} orders eligible for revision
             </Typography>
           </Stack>
         </Stack>
@@ -4515,7 +4502,7 @@ const SORevise = () => {
                     </Typography>
                   </TableCell>
                 </TableRow>
-              ) : salesOrders.length === 0 ? (
+              ) : paginatedOrders.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                     <Box sx={{ textAlign: 'center' }}>
@@ -4530,7 +4517,7 @@ const SORevise = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                salesOrders.map((so) => {
+                paginatedOrders.map((so) => {
                   const isActionMenuOpen = Boolean(actionMenuAnchor) && selectedSOForAction?._id === so._id;
                   const avatarColor = getAvatarColor(so);
                   const statusColors = getStatusColor(so.status);

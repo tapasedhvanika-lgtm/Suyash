@@ -80,7 +80,7 @@ exports.createMachine = async (req, res) => {
 
   } catch (error) {
     console.error('Create machine error:', error);
-    
+
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -362,6 +362,68 @@ exports.getCapacityReport = async (req, res) => {
 
   } catch (error) {
     console.error('Get capacity report error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Delete a machine
+// @route   DELETE /api/machines/:id
+// @access  Admin, Manager
+exports.deleteMachine = async (req, res) => {
+  try {
+    const machine = await Machine.findById(req.params.id);
+
+    if (!machine) {
+      return res.status(404).json({
+        success: false,
+        message: 'Machine not found'
+      });
+    }
+
+    await Machine.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: `Machine ${machine.machine_code} (${machine.machine_name}) has been deleted successfully.`
+    });
+
+  } catch (error) {
+    console.error('Delete Machine error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// @desc    Bulk Delete Machines
+// @route   POST /api/machines/bulk-delete
+// @access  Admin, Manager
+exports.bulkDeleteMachines = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No machine IDs provided for deletion.'
+      });
+    }
+
+    // Perform the bulk delete
+    const result = await Machine.deleteMany({ _id: { $in: ids } });
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} machine(s) permanently deleted successfully.`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('Bulk Delete Machine error:', error);
     res.status(500).json({
       success: false,
       message: error.message

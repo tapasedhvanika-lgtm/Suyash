@@ -1,419 +1,3 @@
-// const Routing = require('../../models/BOM/Routing');
-// const Machine = require('../../models/BOM/Machine');
-// const ProcessMaster = require('../../models/CRM/Process');
-// const Item = require('../../models/CRM/Item');
-// const mongoose = require('mongoose');
-
-// // Helper to generate routing ID
-// async function generateRoutingId() {
-//   const now = new Date();
-//   const year = now.getFullYear();
-//   const month = String(now.getMonth() + 1).padStart(2, '0');
-//   const prefix = `RTG-${year}${month}`;
-  
-//   const lastRouting = await Routing.findOne(
-//     { routing_id: new RegExp(`^${prefix}`) },
-//     { routing_id: 1 }
-//   ).sort({ routing_id: -1 });
-  
-//   let sequence = 1;
-//   if (lastRouting) {
-//     const lastSeq = parseInt(lastRouting.routing_id.split('-').pop());
-//     sequence = lastSeq + 1;
-//   }
-  
-//   return `${prefix}-${String(sequence).padStart(4, '0')}`;
-// }
-
-// // @desc    Create new routing
-// // @route   POST /api/routings
-// // @access  Manager, Production
-// exports.createRouting = async (req, res) => {
-//   try {
-//     const {
-//       routing_name,
-//       routing_type,
-//       applicable_items,
-//       operations,
-//       version = '1.0'
-//     } = req.body;
-
-//     if (!routing_name || !routing_type || !operations) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Missing required fields: routing_name, routing_type, operations'
-//       });
-//     }
-
-//     const sequences = operations.map(op => op.op_sequence);
-//     if (new Set(sequences).size !== sequences.length) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Operation sequences must be unique'
-//       });
-//     }
-
-//     const sortedSequences = [...sequences].sort((a, b) => a - b);
-//     if (JSON.stringify(sequences) !== JSON.stringify(sortedSequences)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Operations must be in ascending sequence order'
-//       });
-//     }
-
-//     for (const op of operations) {
-//       const process = await ProcessMaster.findById(op.operation_id);
-//       if (!process) {
-//         return res.status(404).json({
-//           success: false,
-//           message: `Process not found for operation: ${op.operation_name}`
-//         });
-//       }
-
-//       if (op.machine_id) {
-//         const machine = await Machine.findById(op.machine_id);
-//         if (!machine) {
-//           return res.status(404).json({
-//             success: false,
-//             message: `Machine not found: ${op.machine_id}`
-//           });
-//         }
-//       }
-//     }
-
-//     if (applicable_items && applicable_items.length > 0) {
-//       const items = await Item.find({ _id: { $in: applicable_items } });
-//       if (items.length !== applicable_items.length) {
-//         return res.status(404).json({
-//           success: false,
-//           message: 'Some applicable items not found'
-//         });
-//       }
-//     }
-
-//     const routing_id = await generateRoutingId();
-
-//     const routing = await Routing.create({
-//       routing_id,
-//       routing_name,
-//       routing_type,
-//       applicable_items: applicable_items || [],
-//       operations,
-//       version,
-//       created_by: req.user._id,
-//       total_cycle_time_min: operations.reduce((sum, op) => sum + op.planned_run_min, 0)
-//     });
-
-//     const populatedRouting = await Routing.findById(routing._id)
-//       .populate('operations.operation_id', 'process_name rate_type standard_rate')
-//       .populate('operations.machine_id', 'machine_name machine_code')
-//       .populate('applicable_items', 'part_no part_description')
-//       .populate('created_by', 'name email');
-
-//     res.status(201).json({
-//       success: true,
-//       message: 'Routing created successfully',
-//       data: populatedRouting
-//     });
-
-//   } catch (error) {
-//     console.error('Create routing error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// // @desc    Get all routings
-// // @route   GET /api/routings
-// // @access  All roles
-// exports.getRoutings = async (req, res) => {
-//   try {
-//     const {
-//       routing_type,
-//       is_active,
-//       applicable_item,
-//       page = 1,
-//       limit = 20,
-//       sort = '-created_at'
-//     } = req.query;
-
-//     const filter = {};
-//     if (routing_type) filter.routing_type = routing_type;
-//     if (is_active !== undefined) filter.is_active = is_active === 'true';
-//     if (applicable_item) filter.applicable_items = applicable_item;
-
-//     const skip = (parseInt(page) - 1) * parseInt(limit);
-
-//     const routings = await Routing.find(filter)
-//       .populate('operations.operation_id', 'process_name rate_type')
-//       .populate('operations.machine_id', 'machine_name machine_code')
-//       .populate('applicable_items', 'part_no part_description')
-//       .populate('created_by', 'name email')
-//       .populate('approved_by', 'name email')
-//       .sort(sort)
-//       .skip(skip)
-//       .limit(parseInt(limit));
-
-//     const total = await Routing.countDocuments(filter);
-
-//     res.status(200).json({
-//       success: true,
-//       data: routings,
-//       pagination: {
-//         page: parseInt(page),
-//         limit: parseInt(limit),
-//         total,
-//         pages: Math.ceil(total / parseInt(limit))
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error('Get routings error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// // @desc    Get routing by ID
-// // @route   GET /api/routings/:id
-// // @access  All roles
-// exports.getRoutingById = async (req, res) => {
-//   try {
-//     const routing = await Routing.findById(req.params.id)
-//       .populate('operations.operation_id', 'process_name rate_type standard_rate description')
-//       .populate('operations.machine_id', 'machine_name machine_code work_centre capacity_value')
-//       .populate('operations.subcontract_vendor', 'vendor_name vendor_code gstin')
-//       .populate('applicable_items', 'part_no part_description item_category')
-//       .populate('created_by', 'name email')
-//       .populate('approved_by', 'name email')
-//       .populate('updated_by', 'name email');
-
-//     if (!routing) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Routing not found'
-//       });
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       data: routing
-//     });
-
-//   } catch (error) {
-//     console.error('Get routing by ID error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// // @desc    Update routing
-// // @route   PUT /api/routings/:id
-// // @access  Manager
-// exports.updateRouting = async (req, res) => {
-//   try {
-//     const routing = await Routing.findById(req.params.id);
-
-//     if (!routing) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Routing not found'
-//       });
-//     }
-
-//     const {
-//       routing_name,
-//       routing_type,
-//       applicable_items,
-//       operations,
-//       is_active
-//     } = req.body;
-
-//     if (operations) {
-//       const sequences = operations.map(op => op.op_sequence);
-//       if (new Set(sequences).size !== sequences.length) {
-//         return res.status(400).json({
-//           success: false,
-//           message: 'Operation sequences must be unique'
-//         });
-//       }
-//     }
-
-//     // Prepare update data
-//     const updateData = {
-//       updated_by: req.user._id,
-//       updated_at: new Date()
-//     };
-
-//     if (routing_name !== undefined) updateData.routing_name = routing_name;
-//     if (routing_type !== undefined) updateData.routing_type = routing_type;
-//     if (applicable_items !== undefined) updateData.applicable_items = applicable_items;
-//     if (operations !== undefined) {
-//       updateData.operations = operations;
-//       updateData.total_cycle_time_min = operations.reduce((sum, op) => sum + (op.planned_run_min || 0), 0);
-//     }
-//     if (is_active !== undefined) updateData.is_active = is_active;
-
-//     // Update the existing routing instead of creating new one
-//     const updatedRouting = await Routing.findByIdAndUpdate(
-//       req.params.id,
-//       updateData,
-//       { new: true, runValidators: true }
-//     )
-//       .populate('operations.operation_id', 'process_name rate_type')
-//       .populate('operations.machine_id', 'machine_name machine_code')
-//       .populate('applicable_items', 'part_no part_description')
-//       .populate('created_by', 'name email')
-//       .populate('updated_by', 'name email');
-
-//     res.status(200).json({
-//       success: true,
-//       message: 'Routing updated successfully',
-//       data: updatedRouting
-//     });
-
-//   } catch (error) {
-//     console.error('Update routing error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-// // @desc    Approve routing
-// // @route   POST /api/routings/:id/approve
-// // @access  Manager
-// // @desc    Approve routing
-// // @route   POST /api/routings/:id/approve
-// // @access  Manager
-// exports.approveRouting = async (req, res) => {
-//   try {
-//     const routing = await Routing.findById(req.params.id);
-
-//     if (!routing) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Routing not found'
-//       });
-//     }
-
-//     // ✅ ADD THIS VALIDATION - Check if routing is already approved
-//     if (routing.approved_by && routing.approved_at) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Routing ${routing.routing_id} is already approved. Cannot approve again.`,
-//         data: {
-//           routing_id: routing.routing_id,
-//           routing_name: routing.routing_name,
-//           approved_by: routing.approved_by,
-//           approved_at: routing.approved_at,
-//           already_approved: true
-//         }
-//       });
-//     }
-
-//     // Optional: Check if routing is already deactivated
-//     if (routing.is_active === false) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Cannot approve routing ${routing.routing_id} because it is deactivated.`,
-//         data: {
-//           routing_id: routing.routing_id,
-//           routing_name: routing.routing_name,
-//           is_active: false
-//         }
-//       });
-//     }
-
-//     routing.approved_by = req.user._id;
-//     routing.approved_at = new Date();
-//     await routing.save();
-
-//     // Populate the approved_by field for response
-//     const populatedRouting = await Routing.findById(routing._id)
-//       .populate('approved_by', 'name email');
-
-//     res.status(200).json({
-//       success: true,
-//       message: 'Routing approved successfully',
-//       data: {
-//         routing_id: routing.routing_id,
-//         routing_name: routing.routing_name,
-//         approved_by: populatedRouting.approved_by,
-//         approved_at: routing.approved_at
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error('Approve routing error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-// // @desc    Delete/Deactivate Routing
-// // @route   DELETE /api/routings/:id
-// // @access  Admin, Manager
-// exports.deleteRouting = async (req, res) => {
-//   try {
-//     const routing = await Routing.findById(req.params.id);
-    
-//     if (!routing) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Routing not found'
-//       });
-//     }
-
-//     // Check if routing is used in any open Work Order
-//     const WorkOrder = require('mongoose').model('WorkOrder');
-//     const openWO = await WorkOrder.findOne({
-//       routing_id: routing._id,
-//       status: { $in: ['Planned', 'Released', 'In Progress', 'Partially Completed', 'On Hold'] }
-//     });
-
-//     if (openWO) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Cannot delete Routing - used in open Work Order ${openWO.wo_number}`,
-//         work_order: {
-//           wo_number: openWO.wo_number,
-//           status: openWO.status
-//         }
-//       });
-//     }
-
-//     routing.is_active = false;
-//     await routing.save();
-
-//     res.json({
-//       success: true,
-//       message: 'Routing deactivated successfully',
-//       data: {
-//         routing_id: routing.routing_id,
-//         routing_name: routing.routing_name,
-//         is_active: false
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error('Delete Routing error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
-
 const Routing = require('../../models/BOM/Routing');
 const Machine = require('../../models/BOM/Machine');
 const ProcessMaster = require('../../models/CRM/Process');
@@ -500,9 +84,8 @@ async function validateOperationRefs(operations) {
 // @desc    Create new routing
 // @route   POST /api/routings
 // @access  Manager, Production
-// STATUS on create: always 'Draft'
 // ─────────────────────────────────────────────────────────────────────────────
-exports.createRouting = async (req, res) => {
+const createRouting = async (req, res) => {
   try {
     const {
       routing_name,
@@ -575,7 +158,7 @@ exports.createRouting = async (req, res) => {
 // @route   GET /api/routings
 // @access  All roles
 // ─────────────────────────────────────────────────────────────────────────────
-exports.getRoutings = async (req, res) => {
+const getRoutings = async (req, res) => {
   try {
     const {
       routing_type,
@@ -631,7 +214,7 @@ exports.getRoutings = async (req, res) => {
 // @route   GET /api/routings/:id
 // @access  All roles
 // ─────────────────────────────────────────────────────────────────────────────
-exports.getRoutingById = async (req, res) => {
+const getRoutingById = async (req, res) => {
   try {
     const routing = await Routing.findById(req.params.id)
       .populate('operations.operation_id', 'process_name rate_type standard_rate description')
@@ -661,7 +244,7 @@ exports.getRoutingById = async (req, res) => {
 // @route   GET /api/routings/by-item/:item_id
 // @access  All roles
 // ─────────────────────────────────────────────────────────────────────────────
-exports.getRoutingsByItem = async (req, res) => {
+const getRoutingsByItem = async (req, res) => {
   try {
     const { item_id } = req.params;
 
@@ -685,15 +268,8 @@ exports.getRoutingsByItem = async (req, res) => {
 // @desc    Update routing
 // @route   PUT /api/routings/:id
 // @access  Manager
-//
-// EDIT RULES:
-//   - Draft   → can be freely edited
-//   - Active  → can be edited (manager may need to correct before approval)
-//   - Approved → CANNOT be edited (must reject first, then re-activate)
-//   - Rejected → can be edited (fix issues, then re-activate via /activate)
-//   - is_active=false (soft-deleted) → cannot be edited
 // ─────────────────────────────────────────────────────────────────────────────
-exports.updateRouting = async (req, res) => {
+const updateRouting = async (req, res) => {
   try {
     const routing = await Routing.findById(req.params.id);
 
@@ -736,8 +312,6 @@ exports.updateRouting = async (req, res) => {
       updateData.operations            = preparedOperations;
       updateData.total_cycle_time_min  = preparedOperations.reduce((sum, op) => sum + (op.planned_run_min || 0), 0);
 
-      // If the routing was Rejected and ops are updated, reset to Draft so it must go through
-      // the activate → approve flow again
       if (routing.status === 'Rejected') {
         updateData.status        = 'Draft';
         updateData.rejected_by   = undefined;
@@ -774,11 +348,8 @@ exports.updateRouting = async (req, res) => {
 // @desc    Activate routing (Draft → Active)
 // @route   POST /api/routings/:id/activate
 // @access  Manager
-//
-// Moves routing from Draft (or Rejected after fixes) to Active.
-// Only Active routings can be Approved or Rejected.
 // ─────────────────────────────────────────────────────────────────────────────
-exports.activateRouting = async (req, res) => {
+const activateRouting = async (req, res) => {
   try {
     const routing = await Routing.findById(req.params.id);
 
@@ -807,9 +378,7 @@ exports.activateRouting = async (req, res) => {
       });
     }
 
-    // Allow: Draft → Active, Rejected → Active (after corrections)
     routing.status      = 'Active';
-    // Clear any prior rejection data when re-activating
     routing.rejected_by      = undefined;
     routing.rejected_at      = undefined;
     routing.rejection_reason = undefined;
@@ -838,15 +407,8 @@ exports.activateRouting = async (req, res) => {
 // @desc    Approve routing (Active → Approved)
 // @route   POST /api/routings/:id/approve
 // @access  Manager
-//
-// APPROVE RULES:
-//   - Routing MUST be in 'Active' status to be approved.
-//   - Draft routings cannot be approved (must activate first).
-//   - Already Approved → blocked.
-//   - Rejected → must re-activate first, then approve.
-//   - Soft-deleted (is_active=false) → blocked.
 // ─────────────────────────────────────────────────────────────────────────────
-exports.approveRouting = async (req, res) => {
+const approveRouting = async (req, res) => {
   try {
     const routing = await Routing.findById(req.params.id);
 
@@ -854,7 +416,6 @@ exports.approveRouting = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Routing not found' });
     }
 
-    // Guard: soft-deleted
     if (!routing.is_active) {
       return res.status(400).json({
         success: false,
@@ -862,11 +423,10 @@ exports.approveRouting = async (req, res) => {
       });
     }
 
-    // Guard: must be Active to approve
     if (routing.status === 'Draft') {
       return res.status(400).json({
         success: false,
-        message: `Cannot approve routing ${routing.routing_id} — it is in Draft status. Activate it first via POST /api/routings/${req.params.id}/activate.`,
+        message: `Cannot approve routing ${routing.routing_id} — it is in Draft status. Activate it first.`,
         data: { routing_id: routing.routing_id, status: routing.status }
       });
     }
@@ -888,16 +448,14 @@ exports.approveRouting = async (req, res) => {
     if (routing.status === 'Rejected') {
       return res.status(400).json({
         success: false,
-        message: `Cannot approve routing ${routing.routing_id} — it is Rejected. Re-activate it first via POST /api/routings/${req.params.id}/activate.`,
+        message: `Cannot approve routing ${routing.routing_id} — it is Rejected. Re-activate it first.`,
         data: { routing_id: routing.routing_id, status: routing.status }
       });
     }
 
-    // ✅ Status is 'Active' — proceed
     routing.status      = 'Approved';
     routing.approved_by = req.user._id;
     routing.approved_at = new Date();
-    // Clear any stale rejection data
     routing.rejected_by      = undefined;
     routing.rejected_at      = undefined;
     routing.rejection_reason = undefined;
@@ -931,19 +489,8 @@ exports.approveRouting = async (req, res) => {
 // @desc    Reject routing (Active or Approved → Rejected)
 // @route   POST /api/routings/:id/reject
 // @access  Manager
-//
-// REJECT RULES:
-//   - Can reject an 'Active' routing (failed review before approval).
-//   - Can reject an 'Approved' routing (found issues after approval).
-//   - Cannot reject a 'Draft' — it hasn't been submitted for review.
-//   - Cannot reject an already 'Rejected' routing.
-//   - Soft-deleted → blocked.
-//   - rejection_reason is required.
-//
-// AFTER REJECTION: User must edit the routing, then re-activate before
-//   re-submitting for approval.
 // ─────────────────────────────────────────────────────────────────────────────
-exports.rejectRouting = async (req, res) => {
+const rejectRouting = async (req, res) => {
   try {
     const routing = await Routing.findById(req.params.id);
 
@@ -951,7 +498,6 @@ exports.rejectRouting = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Routing not found' });
     }
 
-    // Guard: soft-deleted
     if (!routing.is_active) {
       return res.status(400).json({
         success: false,
@@ -959,7 +505,6 @@ exports.rejectRouting = async (req, res) => {
       });
     }
 
-    // Guard: rejection_reason required
     const { rejection_reason } = req.body;
     if (!rejection_reason || !rejection_reason.trim()) {
       return res.status(400).json({
@@ -968,7 +513,6 @@ exports.rejectRouting = async (req, res) => {
       });
     }
 
-    // Guard: cannot reject Draft (not yet submitted)
     if (routing.status === 'Draft') {
       return res.status(400).json({
         success: false,
@@ -977,7 +521,6 @@ exports.rejectRouting = async (req, res) => {
       });
     }
 
-    // Guard: already Rejected
     if (routing.status === 'Rejected') {
       return res.status(400).json({
         success: false,
@@ -991,14 +534,12 @@ exports.rejectRouting = async (req, res) => {
       });
     }
 
-    // ✅ Status is 'Active' or 'Approved' — proceed with rejection
     routing.status           = 'Rejected';
     routing.rejected_by      = req.user._id;
     routing.rejected_at      = new Date();
     routing.rejection_reason = rejection_reason.trim();
     routing.updated_by       = req.user._id;
 
-    // Clear approval data if it was previously approved
     if (routing.approved_by) {
       routing.approved_by = undefined;
       routing.approved_at = undefined;
@@ -1030,14 +571,11 @@ exports.rejectRouting = async (req, res) => {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// @desc    Delete / Deactivate Routing (soft delete)
+// @desc    Delete Routing (single)
 // @route   DELETE /api/routings/:id
 // @access  Admin, Manager
-//
-// Sets is_active = false. This is a SOFT DELETE — separate from status.
-// Cannot deactivate if routing is used in open Work Orders.
 // ─────────────────────────────────────────────────────────────────────────────
-exports.deleteRouting = async (req, res) => {
+const deleteRouting = async (req, res) => {
   try {
     const routing = await Routing.findById(req.params.id);
 
@@ -1045,27 +583,20 @@ exports.deleteRouting = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Routing not found' });
     }
 
-    // Check if routing is used in ANY Work Order (not just open ones)
+    // ✅ Work Order check commented out to allow deletion during testing.
+    /*
     const WorkOrder = mongoose.model('WorkOrder');
-    const workOrderExists = await WorkOrder.findOne({
-      routing_id: routing._id
-    });
+    const workOrderExists = await WorkOrder.findOne({ routing_id: routing._id });
 
     if (workOrderExists) {
       return res.status(400).json({
         success: false,
         message: `Cannot delete Routing — it is referenced in Work Order ${workOrderExists.wo_number}.`,
-        work_order: { 
-          wo_number: workOrderExists.wo_number, 
-          status: workOrderExists.status 
-        }
+        work_order: { wo_number: workOrderExists.wo_number, status: workOrderExists.status }
       });
     }
+    */
 
-    // Remove ProductionOrder check if model doesn't exist
-    // Only add back when ProductionOrder model is created
-
-    // HARD DELETE - permanently remove from database
     await Routing.findByIdAndDelete(req.params.id);
 
     res.json({
@@ -1082,4 +613,54 @@ exports.deleteRouting = async (req, res) => {
     console.error('Delete Routing error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @desc    Bulk Delete Routings
+// @route   POST /api/routings/bulk-delete
+// @access  Admin, Manager
+// ─────────────────────────────────────────────────────────────────────────────
+const bulkDeleteRoutings = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No routing IDs provided for deletion.'
+      });
+    }
+
+    // Perform the bulk delete
+    const result = await Routing.deleteMany({ _id: { $in: ids } });
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} routing(s) permanently deleted successfully.`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('Bulk Delete Routing error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+// ─── EXPORTS ──────────────────────────────────────────────────────────────────
+module.exports = {
+  createRouting,
+  getRoutings,
+  getRoutingById,
+  getRoutingsByItem,
+  updateRouting,
+  activateRouting,
+  approveRouting,
+  rejectRouting,
+  deleteRouting,
+  bulkDeleteRoutings
 };

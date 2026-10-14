@@ -2,6 +2,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // controllers/CRM/salesOrderController.js
 // UPDATED: Now uses item_id from Item Master instead of part_no
+// UPDATED: Commented out strict line-item status transition checks to allow 
+//          manual status override from frontend.
+// UPDATED: Added bulkDeleteSalesOrders to handle multiple deletions.
+// UPDATED: Expanded allowed statuses in both deleteSalesOrder and 
+//          bulkDeleteSalesOrders to include 'Closed' and 'Confirmed'.
+// UPDATED: Fixed getOrderBook to return customer_name and items.
+// UPDATED: Added dispatchSalesOrderItems for ViewOrderModal dispatch feature.
+// UPDATED: Fixed getReportSummary date filter to include the entire 'to' day.
+// UPDATED: Added _id to getReportPendingDelivery so frontend can open ViewOrderModal.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const mongoose   = require('mongoose');
@@ -439,7 +448,7 @@ const getSalesOrders = async (req, res) => {
     if (from || to) {
       q.so_date = {};
       if (from) q.so_date.$gte = new Date(from);
-      if (to)   q.so_date.$lte = new Date(to);
+      if (to)   q.so_date.$lte = new Date(new Date(to).setHours(23, 59, 59, 999));
     }
 
     const pageNum  = Math.max(parseInt(page)  || 1, 1);
@@ -672,6 +681,38 @@ async function updateDeliveryQty(soId, lineItemId, dispatchedQty, dispatchDate) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /api/sales-orders/:id/dispatch → Dispatch multiple line items
+// ─────────────────────────────────────────────────────────────────────────────
+const dispatchSalesOrderItems = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items } = req.body; // Expects: [{ lineItemId, dispatchedQty, dispatchDate }]
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return err(res, 'Please provide an array of items to dispatch.', 400);
+    }
+
+    let updatedSO = null;
+    for (const item of items) {
+      updatedSO = await updateDeliveryQty(
+        id, 
+        item.lineItemId, 
+        item.dispatchedQty, 
+        item.dispatchDate || new Date()
+      );
+    }
+
+    return ok(res, {
+      message: `Successfully dispatched ${items.length} item(s).`,
+      data: updatedSO
+    });
+  } catch (e) {
+    console.error('[dispatchSalesOrderItems] Error:', e);
+    return err(res, e.message, 400);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/sales-orders/:id/delivery-status
 // ─────────────────────────────────────────────────────────────────────────────
 const getDeliveryStatus = async (req, res) => {
@@ -751,7 +792,7 @@ const getOrderBook = async (req, res) => {
     const today = new Date();
     const sos = await SalesOrder.find({
       is_active: true,
-      status: { $in: ['Confirmed', 'In Production', 'Ready for Dispatch', 'Partially Delivered'] },
+      status: { $in: ['Confirmed', 'In Production', 'Ready for Dispatch', 'Partially Delivered', 'Fully Delivered', 'Closed'] },
     })
       .populate('customer_id', 'customer_name customer_code')
       .select('so_number so_date customer_name customer_po_number status grand_total items confirmed_at')
@@ -785,13 +826,15 @@ const getOrderBook = async (req, res) => {
           });
 
         return {
+          _id:                so._id,
           so_number:          so.so_number,
           so_date:            so.so_date,
-          customer:           so.customer_name,
+          customer_name:      so.customer_name,
           customer_po_number: so.customer_po_number,
           status:             so.status,
           grand_total:        so.grand_total,
           confirmed_at:       so.confirmed_at,
+          items:              so.items,
           pending_lines,
         };
       })
@@ -1441,8 +1484,12 @@ const getReportSummary = async (req, res) => {
     if (from || to) {
       match.so_date = {};
       if (from) match.so_date.$gte = new Date(from);
-      if (to)   match.so_date.$lte = new Date(to);
+      // ✅ FIX: Include the entire 'to' day (up to 23:59:59) so orders on that day are counted
+      if (to)   match.so_date.$lte = new Date(new Date(to).setHours(23, 59, 59, 999));
     }
+
+    // ✅ FIX: Use the SAME match for byStatus so all cards are consistent with the date filter
+    const matchForStatus = { ...match };
 
     const [byCustomer, byMonth, byStatus, total] = await Promise.all([
       SalesOrder.aggregate([
@@ -1469,7 +1516,7 @@ const getReportSummary = async (req, res) => {
       ]),
 
       SalesOrder.aggregate([
-        { $match: { is_active: true } },
+        { $match: matchForStatus }, // ✅ Now uses the same date filter
         { $group: {
           _id:   '$status',
           count: { $sum: 1 },
@@ -1502,7 +1549,6 @@ const getReportSummary = async (req, res) => {
     return err(res, e.message);
   }
 };
-
 
 const updateSalesOrderStatus = async (req, res) => {
   try {
@@ -1547,7 +1593,13 @@ const updateSalesOrderStatus = async (req, res) => {
       );
     }
 
-    // === LINE ITEM VALIDATIONS ===
+    // =========================================================================
+    // NOTE: LINE ITEM VALIDATIONS HAVE BEEN COMMENTED OUT SO YOU CAN 
+    // OVERRIDE THE STATUS FROM THE FRONTEND WITHOUT DISPATCHING ITEMS FIRST.
+    // UNCOMMENT THESE BLOCKS IF YOU WANT TO ENFORCE STRICT BUSINESS LOGIC LATER.
+    // =========================================================================
+    
+    /*
     if (status === 'Ready for Dispatch') {
       const missingCommittedDate = salesOrder.items.filter(
         item => !item.is_cancelled && !item.committed_date
@@ -1581,6 +1633,7 @@ const updateSalesOrderStatus = async (req, res) => {
         return err(res, 'Cannot change to Partially Delivered. All items already delivered', 400);
       }
     }
+    */
 
     // Prepare update data
     const updateData = { status, updated_by: userId };
@@ -1648,7 +1701,6 @@ const updateSalesOrderStatus = async (req, res) => {
   }
 };
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/sales-orders/reports/pending-delivery
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1684,6 +1736,7 @@ const getReportPendingDelivery = async (req, res) => {
       );
 
       byCustomer[key].orders.push({
+        _id:          so._id, // ✅ हे जोडले आहे (महत्त्वाचे!)
         so_number:    so.so_number,
         status:       so.status,
         so_value:     so.grand_total,
@@ -1717,6 +1770,7 @@ const getReportPendingDelivery = async (req, res) => {
     return err(res, e.message);
   }
 };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/sales-orders/:id  → Hard delete a Sales Order (Admin only)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1729,19 +1783,14 @@ const deleteSalesOrder = async (req, res) => {
     const so = await SalesOrder.findOne({ _id: req.params.id, is_active: true });
     if (!so) return err(res, 'Sales Order not found', 404);
 
-    // Only allow deletion of Draft or Cancelled orders
-    if (!['Draft', 'Cancelled'].includes(so.status)) {
+    // ✅ UPDATED: Allow deletion of Draft, Cancelled, Closed, or Confirmed orders
+    if (!['Draft', 'Cancelled', 'Closed', 'Confirmed'].includes(so.status)) {
       return err(
         res, 
-        `Cannot delete Sales Order in status: ${so.status}. Only Draft or Cancelled orders can be deleted.`, 
+        `Cannot delete Sales Order in status: ${so.status}. Only Draft, Cancelled, Closed, or Confirmed orders can be deleted.`, 
         400
       );
     }
-
-    // Optional: Check if user has admin权限
-    // if (req.user.role !== 'admin') {
-    //   return err(res, 'Only administrators can delete Sales Orders', 403);
-    // }
 
     // Check if any linked records exist (optional - prevents orphaned references)
     const WorkOrder = mongoose.model('WorkOrder');
@@ -1758,7 +1807,6 @@ const deleteSalesOrder = async (req, res) => {
     // Hard delete - remove from database
     await SalesOrder.deleteOne({ _id: so._id });
 
-    // Log the deletion (optional - if you have an audit log collection)
     console.log(`[deleteSalesOrder] SO ${so.so_number} deleted by user ${req.user._id}`);
 
     return ok(res, {
@@ -1775,6 +1823,55 @@ const deleteSalesOrder = async (req, res) => {
     return err(res, e.message);
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/sales-orders/bulk-delete  → Bulk delete multiple Sales Orders
+// ─────────────────────────────────────────────────────────────────────────────
+const bulkDeleteSalesOrders = async (req, res) => {
+  try {
+    const { ids } = req.body; // Frontend should send: { ids: ["id1", "id2"] }
+
+    // 1. Validate payload
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return err(res, 'Please provide a non-empty array of Sales Order IDs.', 400);
+    }
+
+    // 2. Validate ObjectIds
+    const invalidIds = ids.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return err(res, `Invalid Sales Order ID(s): ${invalidIds.join(', ')}`, 400);
+    }
+
+    // 3. Fetch orders to check business rules
+    const orders = await SalesOrder.find({ _id: { $in: ids }, is_active: true });
+    
+    // ✅ UPDATED: Allow deletion of Draft, Cancelled, Closed, or Confirmed orders
+    const blockedOrders = orders.filter(so => !['Draft', 'Cancelled', 'Closed', 'Confirmed'].includes(so.status));
+    if (blockedOrders.length > 0) {
+      const blockedNumbers = blockedOrders.map(o => `${o.so_number} (${o.status})`).join(', ');
+      return err(
+        res, 
+        `Cannot delete orders that are not Draft, Cancelled, Closed, or Confirmed. Blocked: ${blockedNumbers}`, 
+        400
+      );
+    }
+
+    // 4. Perform hard delete
+    const result = await SalesOrder.deleteMany({ _id: { $in: ids } });
+
+    console.log(`[bulkDeleteSalesOrders] Deleted ${result.deletedCount} SOs by user ${req.user._id}`);
+
+    return ok(res, {
+      message: `Successfully deleted ${result.deletedCount} Sales Order(s).`,
+      data: { deletedCount: result.deletedCount }
+    });
+
+  } catch (e) {
+    console.error('[bulkDeleteSalesOrders] Error:', e);
+    return err(res, e.message);
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/sales-orders/:id/cancel-line/:lineItemId
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1848,7 +1945,8 @@ module.exports = {
   uploadPoFile,
   updateDeliveryQty,
   createSalesOrder,
-  deleteSalesOrder, 
+  deleteSalesOrder,
+  bulkDeleteSalesOrders,
   getSalesOrders,
   getSalesOrderById,
   updateSalesOrder,
@@ -1865,5 +1963,6 @@ module.exports = {
   cancelSoLineItem,
   getReportSummary,
   getReportPendingDelivery,
-  updateSalesOrderStatus
+  updateSalesOrderStatus,
+  dispatchSalesOrderItems
 };

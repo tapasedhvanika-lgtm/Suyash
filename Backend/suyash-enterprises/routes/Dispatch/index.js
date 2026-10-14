@@ -1573,6 +1573,10 @@ router.get('/delivery-schedules', deliveryScheduleController.listDeliverySchedul
  *         description: Unauthorized
  */
 router.put('/delivery-schedules/:id/confirm', deliveryScheduleController.confirmDeliverySchedule);
+router.delete(
+  '/delivery-schedules/:id',
+  deliveryScheduleController.deleteDeliverySchedule
+);
 
 // ======================================================
 // DELIVERY CHALLAN ROUTES

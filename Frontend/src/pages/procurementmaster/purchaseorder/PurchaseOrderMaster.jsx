@@ -1121,13 +1121,31 @@ const StatusChip = ({ status }) => {
   );
 };
 
-const ActionMenu = ({ item, onView, onApprove, onSend, onAcknowledge, onRemind, onViewTimeline, onClose, anchorEl, onOpen, sendingPoId, permissions }) => {
-  const canView = hasPermission(permissions, MODULES.PURCHASE_ORDER_MASTER, PAGES.PURCHASE_ORDER_MASTER, ACTIONS.VIEW);
-  const canUpdate = hasPermission(permissions, MODULES.PURCHASE_ORDER_MASTER, PAGES.PURCHASE_ORDER_MASTER, ACTIONS.UPDATE);
-  const canApproveAction = hasPermission(permissions, MODULES.PURCHASE_ORDER_MASTER, PAGES.PURCHASE_ORDER_MASTER, ACTIONS.APPROVE);
-  
+const ActionMenu = ({ item, onView, onApprove, onSend, onAcknowledge, onRemind, onViewTimeline, onClose, anchorEl, onOpen, sendingPoId, permissions, isSuperAdmin }) => {
+  const canView = isSuperAdmin || hasPermission(
+  permissions,
+  MODULES.PURCHASE_ORDER_MASTER,
+  PAGES.PURCHASE_ORDER_MASTER,
+  ACTIONS.VIEW
+);
+
+const canUpdate = isSuperAdmin || hasPermission(
+  permissions,
+  MODULES.PURCHASE_ORDER_MASTER,
+  PAGES.PURCHASE_ORDER_MASTER,
+  ACTIONS.UPDATE
+);
+
+const canApproveAction = isSuperAdmin || hasPermission(
+  permissions,
+  MODULES.PURCHASE_ORDER_MASTER,
+  PAGES.PURCHASE_ORDER_MASTER,
+  ACTIONS.APPROVE
+);
+console.log("APPROVE CHECK:", { isSuperAdmin, canApproveAction });
+console.log("PO STATUS:", item.status, "CAN APPROVE:", canApproveAction);
   // Status-based action availability with permission checks - using backend statuses
-  const canApprove = item.status === 'Pending' && canApproveAction;
+  const canApprove = item.status === 'Draft' && canApproveAction;
   const canSend = item.status === 'Approved' && canUpdate;
   const canAcknowledge = item.status === 'Sent' && canUpdate;
   const canRemind = item.status === 'Sent' && canUpdate;
@@ -1420,10 +1438,50 @@ const PurchaseOrderMaster = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (!canDelete) return;
-    showNotification('Bulk delete requires API implementation', 'warning');
-  };
+  if (!canDelete || selected.length === 0) return;
 
+  
+  try {
+    setLoading(true);
+
+    const token = localStorage.getItem('token');
+
+    const response = await axios.post(
+      `${BASE_URL}/api/purchase-orders/bulk-delete`,
+      { ids: selected },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (response.data.success) {
+      showNotification(
+        response.data.message || 'Purchase Orders deleted successfully',
+        'success'
+      );
+
+      setSelected([]);
+      await fetchPOs();
+    } else {
+      showNotification(
+        response.data.message || 'Failed to delete Purchase Orders',
+        'error'
+      );
+    }
+  } catch (err) {
+    console.error('Bulk delete error:', err);
+
+    showNotification(
+      err.response?.data?.message || 'Failed to delete Purchase Orders',
+      'error'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
     setSelected([]);
@@ -1856,6 +1914,7 @@ const PurchaseOrderMaster = () => {
                           onOpen={(e) => handleActionMenuOpen(e, po)}
                           sendingPoId={sendingPoId}
                           permissions={userPermissions}
+                          isSuperAdmin={isSuperAdmin}
                         />
                       </TableCell>
                     </TableRow>

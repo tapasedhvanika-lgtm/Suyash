@@ -1,4 +1,4 @@
-// MrpRun.jsx - Fixed version
+// MrpRun.jsx - Fixed version with fallback handling
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -106,6 +106,7 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
     const [mrpRun, setMrpRun] = useState(null);
     const [jobStatus, setJobStatus] = useState(null);
     const [pollingInterval, setPollingInterval] = useState(null);
+    const [fallbackMode, setFallbackMode] = useState(false); // Track fallback mode
 
     // Form state
     const [formData, setFormData] = useState({
@@ -137,11 +138,11 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
     // Reset state when dialog opens
     useEffect(() => {
         if (open) {
-            // Reset all state to initial values
             setActiveStep(0);
             setMrpRun(null);
             setJobStatus(null);
             setError('');
+            setFallbackMode(false);
             setFormData({
                 run_type: 'Full',
                 planning_horizon: 30,
@@ -180,15 +181,12 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
     };
 
     const handleSalesOrderChange = (event) => {
-    const {
-        target: { value },
-    } = event;
-
-    setFormData(prev => ({
-        ...prev,
-        so_ids: typeof value === 'string' ? value.split(',') : value,
-    }));
-};
+        const { target: { value } } = event;
+        setFormData(prev => ({
+            ...prev,
+            so_ids: typeof value === 'string' ? value.split(',') : value,
+        }));
+    };
 
     const validateForm = () => {
         const errors = {};
@@ -223,8 +221,7 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
 
         setLoading(true);
         setError('');
-        
-        // Move to step 1 (Run MRP)
+        setFallbackMode(false);
         setActiveStep(1);
 
         try {
@@ -243,7 +240,12 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
 
             if (response.data.success) {
                 setMrpRun(response.data.data);
-                // Start polling for status
+
+                // ✅ Check if backend is in fallback mode
+                if (response.data.data.fallback || response.data.data.job_id?.startsWith('fallback-')) {
+                    setFallbackMode(true);
+                }
+
                 startPolling(response.data.data._id);
 
                 if (onRunComplete) {
@@ -270,12 +272,10 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
     };
 
     const startPolling = (mrpRunId) => {
-        // Clear any existing interval
         if (pollingInterval) {
             clearInterval(pollingInterval);
         }
 
-        // Poll every 2 seconds
         const interval = setInterval(async () => {
             try {
                 const token = localStorage.getItem('token');
@@ -289,7 +289,6 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
                 if (response.data.success) {
                     setJobStatus(response.data.data);
 
-                    // If job is completed or failed, stop polling
                     if (response.data.data.status === 'Completed' ||
                         response.data.data.status === 'Failed' ||
                         response.data.data.status === 'Cancelled') {
@@ -323,6 +322,7 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
         setMrpRun(null);
         setJobStatus(null);
         setError('');
+        setFallbackMode(false);
         setFormData({
             run_type: 'Full',
             planning_horizon: 30,
@@ -339,50 +339,37 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
         setMrpRun(null);
         setJobStatus(null);
         setError('');
+        setFallbackMode(false);
         onClose();
     };
 
     const getRunTypeLabel = (type) => {
         switch (type) {
-            case 'Full':
-                return 'Full MRP Run';
-            case 'Incremental':
-                return 'Incremental MRP Run';
-            case 'Item-Specific':
-                return 'Item-Specific MRP Run';
-            default:
-                return type;
+            case 'Full': return 'Full MRP Run';
+            case 'Incremental': return 'Incremental MRP Run';
+            case 'Item-Specific': return 'Item-Specific MRP Run';
+            default: return type;
         }
     };
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'Running':
-                return { bg: `${COLORS.info}15`, color: COLORS.info, icon: <CircularProgress size={16} /> };
-            case 'Completed':
-                return { bg: `${COLORS.success}15`, color: COLORS.success, icon: <CheckCircleIcon fontSize="small" /> };
-            case 'Failed':
-                return { bg: `${COLORS.error}15`, color: COLORS.error, icon: <ErrorIcon fontSize="small" /> };
-            case 'Queued':
-                return { bg: `${COLORS.warning}15`, color: COLORS.warning, icon: <ScheduleIcon fontSize="small" /> };
-            default:
-                return { bg: `${COLORS.text.tertiary}15`, color: COLORS.text.secondary, icon: null };
+            case 'Running': return { bg: `${COLORS.info}15`, color: COLORS.info, icon: <CircularProgress size={16} /> };
+            case 'Completed': return { bg: `${COLORS.success}15`, color: COLORS.success, icon: <CheckCircleIcon fontSize="small" /> };
+            case 'Failed': return { bg: `${COLORS.error}15`, color: COLORS.error, icon: <ErrorIcon fontSize="small" /> };
+            case 'Queued': return { bg: `${COLORS.warning}15`, color: COLORS.warning, icon: <ScheduleIcon fontSize="small" /> };
+            default: return { bg: `${COLORS.text.tertiary}15`, color: COLORS.text.secondary, icon: null };
         }
     };
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
         });
     };
 
     const showNotification = (message, severity) => {
-        // Implement your notification logic here
         console.log(message, severity);
     };
 
@@ -391,22 +378,8 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
             case 0:
                 return (
                     <Stack spacing={3}>
-                        <Paper sx={{
-                            p: 2.5,
-                            bgcolor: COLORS.background.white,
-                            borderRadius: 1.5,
-                            border: `1px solid ${COLORS.border}`,
-                            boxShadow: 'none'
-                        }}>
-                            <Typography sx={{
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                color: COLORS.primary,
-                                mb: 2,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1
-                            }}>
+                        <Paper sx={{ p: 2.5, bgcolor: COLORS.background.white, borderRadius: 1.5, border: `1px solid ${COLORS.border}`, boxShadow: 'none' }}>
+                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: COLORS.primary, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <FactoryIcon sx={{ fontSize: '1rem' }} />
                                 MRP Configuration
                             </Typography>
@@ -417,40 +390,11 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
                                         Run Type <span style={{ color: COLORS.error }}>*</span>
                                     </Typography>
                                     <FormControl fullWidth size="small" error={!!fieldErrors.run_type}>
-                                        <Select
-                                            name="run_type"
-                                            value={formData.run_type}
-                                            onChange={handleChange}
-                                            sx={{ borderRadius: 1.5, fontSize: '0.75rem' }}
-                                        >
-                                            <MenuItem value="Full" sx={{ fontSize: '0.75rem' }}>
-                                                <Stack direction="row" alignItems="center" spacing={1}>
-                                                    <span>Full MRP Run</span>
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        - Recalculates all requirements
-                                                    </Typography>
-                                                </Stack>
-                                            </MenuItem>
-                                            <MenuItem value="Incremental" sx={{ fontSize: '0.75rem' }}>
-                                                <Stack direction="row" alignItems="center" spacing={1}>
-                                                    <span>Incremental MRP Run</span>
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        - Only changed items since last run
-                                                    </Typography>
-                                                </Stack>
-                                            </MenuItem>
-                                            <MenuItem value="Item-Specific" sx={{ fontSize: '0.75rem' }}>
-                                                <Stack direction="row" alignItems="center" spacing={1}>
-                                                    <span>Item-Specific MRP Run</span>
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        - Specific items only
-                                                    </Typography>
-                                                </Stack>
-                                            </MenuItem>
+                                        <Select name="run_type" value={formData.run_type} onChange={handleChange} sx={{ borderRadius: 1.5, fontSize: '0.75rem' }}>
+                                            <MenuItem value="Full" sx={{ fontSize: '0.75rem' }}>Full MRP Run</MenuItem>
+                                            <MenuItem value="Incremental" sx={{ fontSize: '0.75rem' }}>Incremental MRP Run</MenuItem>
+                                            <MenuItem value="Item-Specific" sx={{ fontSize: '0.75rem' }}>Item-Specific MRP Run</MenuItem>
                                         </Select>
-                                        {fieldErrors.run_type && (
-                                            <FormHelperText error>{fieldErrors.run_type}</FormHelperText>
-                                        )}
                                     </FormControl>
                                 </Grid>
 
@@ -458,70 +402,22 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
                                     <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.secondary, mb: 0.5 }}>
                                         Planning Horizon (days) <span style={{ color: COLORS.error }}>*</span>
                                     </Typography>
-                                    <TextField
-                                        fullWidth
-                                        type="number"
-                                        size="small"
-                                        name="planning_horizon"
-                                        value={formData.planning_horizon}
-                                        onChange={handleChange}
-                                        error={!!fieldErrors.planning_horizon}
-                                        helperText={fieldErrors.planning_horizon}
-                                        InputProps={{ inputProps: { min: 1, max: 365 } }}
-                                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5, fontSize: '0.75rem' } }}
-                                    />
+                                    <TextField fullWidth type="number" size="small" name="planning_horizon" value={formData.planning_horizon} onChange={handleChange} error={!!fieldErrors.planning_horizon} helperText={fieldErrors.planning_horizon} InputProps={{ inputProps: { min: 1, max: 365 } }} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5, fontSize: '0.75rem' } }} />
                                 </Grid>
 
                                 <Grid size={{ xs: 12 }}>
-                                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.secondary, mb: 0.5 }}>
-                                        Sales Orders (Optional)
-                                    </Typography>
+                                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: COLORS.text.secondary, mb: 0.5 }}>Sales Orders (Optional)</Typography>
                                     <FormControl fullWidth size="small">
-    <Select
-        multiple
-        value={formData.so_ids || []}
-        onChange={handleSalesOrderChange}
-        renderValue={(selected) => (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {selected.map((value) => {
-                    const so = salesOrders.find(s => s.so_number === value);
-                    return (
-                        <Chip
-                            key={value}
-                            label={so?.so_number || value}
-                            size="small"
-                        />
-                    );
-                })}
-            </Box>
-        )}
-    >
-        {salesOrders.map((so) => (
-            <MenuItem key={so._id} value={so.so_number}>
-                <Checkbox checked={formData.so_ids.includes(so.so_number)} />
-                <ListItemText primary={so.so_number} />
-            </MenuItem>
-        ))}
-    </Select>
-</FormControl>
-                                    <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.tertiary, mt: 0.5 }}>
-                                        Leave empty to run MRP for all confirmed sales orders
-                                    </Typography>
+                                        <Select multiple value={formData.so_ids || []} onChange={handleSalesOrderChange} renderValue={(selected) => (<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>{selected.map((value) => { const so = salesOrders.find(s => s.so_number === value); return (<Chip key={value} label={so?.so_number || value} size="small" />); })}</Box>)}>
+                                            {salesOrders.map((so) => (<MenuItem key={so._id} value={so.so_number}><Checkbox checked={formData.so_ids.includes(so.so_number)} /><ListItemText primary={so.so_number} /></MenuItem>))}
+                                        </Select>
+                                    </FormControl>
+                                    <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.tertiary, mt: 0.5 }}>Leave empty to run MRP for all confirmed sales orders</Typography>
                                 </Grid>
                             </Grid>
                         </Paper>
 
-                        {/* Info Alert */}
-                        <Alert
-                            severity="info"
-                            sx={{
-                                borderRadius: 1.5,
-                                fontSize: '0.7rem',
-                                '& .MuiAlert-icon': {
-                                    alignItems: 'center'
-                                }
-                            }}
-                        >
+                        <Alert severity="info" sx={{ borderRadius: 1.5, fontSize: '0.7rem' }}>
                             <Typography sx={{ fontSize: '0.7rem' }}>
                                 <strong>What will MRP do?</strong><br />
                                 • Calculate material requirements based on BOM explosion<br />
@@ -536,93 +432,27 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
             case 1:
                 return (
                     <Stack spacing={3}>
-                        <Paper sx={{
-                            p: 3,
-                            bgcolor: COLORS.background.white,
-                            borderRadius: 1.5,
-                            border: `1px solid ${COLORS.border}`,
-                            boxShadow: 'none',
-                            textAlign: 'center'
-                        }}>
+                        <Paper sx={{ p: 3, bgcolor: COLORS.background.white, borderRadius: 1.5, border: `1px solid ${COLORS.border}`, boxShadow: 'none', textAlign: 'center' }}>
                             <CircularProgress size={48} sx={{ color: COLORS.primary, mb: 2 }} />
-                            <Typography sx={{ fontSize: '1rem', fontWeight: 600, color: COLORS.text.primary, mb: 1 }}>
-                                MRP Run in Progress
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary }}>
-                                Processing material requirements...
-                            </Typography>
+                            <Typography sx={{ fontSize: '1rem', fontWeight: 600, color: COLORS.text.primary, mb: 1 }}>MRP Run in Progress</Typography>
+                            <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary }}>Processing material requirements...</Typography>
+
+                            {/* ✅ Fallback Mode Indicator */}
+                            {fallbackMode && (
+                                <Alert severity="warning" sx={{ mt: 2, borderRadius: 1.5, fontSize: '0.7rem', textAlign: 'left' }}>
+                                    <strong>Fallback Mode:</strong> Redis is unavailable. MRP is running directly on the server (in-process). It may take a few moments.
+                                </Alert>
+                            )}
                         </Paper>
 
                         {mrpRun && (
-                            <Paper sx={{
-                                p: 2,
-                                bgcolor: COLORS.background.light,
-                                borderRadius: 1.5,
-                                border: `1px solid ${COLORS.border}`,
-                                boxShadow: 'none'
-                            }}>
-                                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.primary, mb: 1.5 }}>
-                                    MRP Run Details
-                                </Typography>
+                            <Paper sx={{ p: 2, bgcolor: COLORS.background.light, borderRadius: 1.5, border: `1px solid ${COLORS.border}` }}>
+                                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.primary, mb: 1.5 }}>MRP Run Details</Typography>
                                 <Grid container spacing={1.5}>
-                                    <Grid size={{ xs: 6, sm: 4 }}>
-                                        <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
-                                            MRP Run ID
-                                        </Typography>
-                                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                                            {mrpRun.mrp_run_id}
-                                        </Typography>
-                                    </Grid>
-                                    <Grid size={{ xs: 6, sm: 4 }}>
-                                        <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
-                                            Run Type
-                                        </Typography>
-                                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                                            {getRunTypeLabel(mrpRun.run_type)}
-                                        </Typography>
-                                    </Grid>
-                                    <Grid size={{ xs: 6, sm: 4 }}>
-                                        <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
-                                            Status
-                                        </Typography>
-                                        <Chip
-                                            label={mrpRun.status}
-                                            size="small"
-                                            sx={{
-                                                fontSize: '0.65rem',
-                                                height: 24,
-                                                bgcolor: getStatusColor(mrpRun.status).bg,
-                                                color: getStatusColor(mrpRun.status).color
-                                            }}
-                                        />
-                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4 }}><Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>MRP Run ID</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>{mrpRun.mrp_run_id}</Typography></Grid>
+                                    <Grid size={{ xs: 6, sm: 4 }}><Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>Run Type</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>{getRunTypeLabel(mrpRun.run_type)}</Typography></Grid>
+                                    <Grid size={{ xs: 6, sm: 4 }}><Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>Status</Typography><Chip label={mrpRun.status} size="small" sx={{ fontSize: '0.65rem', height: 24, bgcolor: getStatusColor(mrpRun.status).bg, color: getStatusColor(mrpRun.status).color }} /></Grid>
                                 </Grid>
-                            </Paper>
-                        )}
-
-                        {jobStatus && jobStatus.progress !== undefined && (
-                            <Paper sx={{ p: 2, borderRadius: 1.5, border: `1px solid ${COLORS.border}` }}>
-                                <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary, mb: 1 }}>
-                                    Progress: {jobStatus.progress}%
-                                </Typography>
-                                <LinearProgress
-                                    variant="determinate"
-                                    value={jobStatus.progress}
-                                    sx={{
-                                        height: 6,
-                                        borderRadius: 3,
-                                        bgcolor: COLORS.border,
-                                        '& .MuiLinearProgress-bar': {
-                                            bgcolor: COLORS.primary,
-                                            borderRadius: 3
-                                        }
-                                    }}
-                                />
-                                {jobStatus.message && (
-                                    <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary, mt: 1 }}>
-                                        {jobStatus.message}
-                                    </Typography>
-                                )}
                             </Paper>
                         )}
                     </Stack>
@@ -631,148 +461,27 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
             case 2:
                 return (
                     <Stack spacing={3}>
-                        {/* Success Banner */}
-                        <Paper sx={{
-                            p: 3,
-                            bgcolor: `${COLORS.success}10`,
-                            borderRadius: 1.5,
-                            border: `1px solid ${COLORS.success}`,
-                            textAlign: 'center'
-                        }}>
+                        <Paper sx={{ p: 3, bgcolor: `${COLORS.success}10`, borderRadius: 1.5, border: `1px solid ${COLORS.success}`, textAlign: 'center' }}>
                             <CheckCircleIcon sx={{ fontSize: '3rem', color: COLORS.success, mb: 1 }} />
-                            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: COLORS.success, mb: 1 }}>
-                                MRP Run Completed Successfully!
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary }}>
-                                Material requirements have been calculated and recommendations have been generated.
-                            </Typography>
+                            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: COLORS.success, mb: 1 }}>MRP Run Completed Successfully!</Typography>
+                            <Typography sx={{ fontSize: '0.75rem', color: COLORS.text.secondary }}>Material requirements have been calculated and recommendations have been generated.</Typography>
                         </Paper>
 
-                        {/* Summary Cards */}
                         <Grid container spacing={2}>
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                                <Card sx={{ bgcolor: COLORS.background.light, borderRadius: 1.5 }}>
-                                    <CardContent sx={{ textAlign: 'center', p: 2 }}>
-                                        <ShoppingCartIcon sx={{ fontSize: '2rem', color: COLORS.primary, mb: 1 }} />
-                                        <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.primary }}>
-                                            {jobStatus?.summary?.purchase_requisitions || 0}
-                                        </Typography>
-                                        <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>
-                                            Purchase Requisitions
-                                        </Typography>
-                                    </CardContent>
-                                </Card>
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                                <Card sx={{ bgcolor: COLORS.background.light, borderRadius: 1.5 }}>
-                                    <CardContent sx={{ textAlign: 'center', p: 2 }}>
-                                        <AssignmentIcon sx={{ fontSize: '2rem', color: COLORS.primary, mb: 1 }} />
-                                        <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.primary }}>
-                                            {jobStatus?.summary?.work_orders || 0}
-                                        </Typography>
-                                        <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>
-                                            Work Orders
-                                        </Typography>
-                                    </CardContent>
-                                </Card>
-                            </Grid>
-                            <Grid size={{ xs: 12, sm: 4 }}>
-                                <Card sx={{ bgcolor: COLORS.background.light, borderRadius: 1.5 }}>
-                                    <CardContent sx={{ textAlign: 'center', p: 2 }}>
-                                        <WarningIcon sx={{ fontSize: '2rem', color: COLORS.warning, mb: 1 }} />
-                                        <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.primary }}>
-                                            {jobStatus?.summary?.shortages || 0}
-                                        </Typography>
-                                        <Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>
-                                            Material Shortages
-                                        </Typography>
-                                    </CardContent>
-                                </Card>
-                            </Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}><Card sx={{ bgcolor: COLORS.background.light, borderRadius: 1.5 }}><CardContent sx={{ textAlign: 'center', p: 2 }}><ShoppingCartIcon sx={{ fontSize: '2rem', color: COLORS.primary, mb: 1 }} /><Typography sx={{ fontSize: '1.2rem', fontWeight: 700 }}>{jobStatus?.pr_count || 0}</Typography><Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Purchase Requisitions</Typography></CardContent></Card></Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}><Card sx={{ bgcolor: COLORS.background.light, borderRadius: 1.5 }}><CardContent sx={{ textAlign: 'center', p: 2 }}><AssignmentIcon sx={{ fontSize: '2rem', color: COLORS.primary, mb: 1 }} /><Typography sx={{ fontSize: '1.2rem', fontWeight: 700 }}>{jobStatus?.wo_count || 0}</Typography><Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Work Orders</Typography></CardContent></Card></Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}><Card sx={{ bgcolor: COLORS.background.light, borderRadius: 1.5 }}><CardContent sx={{ textAlign: 'center', p: 2 }}><WarningIcon sx={{ fontSize: '2rem', color: COLORS.warning, mb: 1 }} /><Typography sx={{ fontSize: '1.2rem', fontWeight: 700 }}>{jobStatus?.summary?.shortages || 0}</Typography><Typography sx={{ fontSize: '0.7rem', color: COLORS.text.secondary }}>Material Shortages</Typography></CardContent></Card></Grid>
                         </Grid>
 
-                        {/* MRP Run Details */}
-                        <Paper sx={{
-                            p: 2,
-                            bgcolor: COLORS.background.white,
-                            borderRadius: 1.5,
-                            border: `1px solid ${COLORS.border}`,
-                            boxShadow: 'none'
-                        }}>
-                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.primary, mb: 1.5 }}>
-                                MRP Run Details
-                            </Typography>
-
+                        <Paper sx={{ p: 2, bgcolor: COLORS.background.white, borderRadius: 1.5, border: `1px solid ${COLORS.border}` }}>
+                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.primary, mb: 1.5 }}>MRP Run Details</Typography>
                             <Grid container spacing={1.5}>
-                                <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
-                                        MRP Run ID
-                                    </Typography>
-                                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                                        {jobStatus?.mrp_run_id || mrpRun?.mrp_run_id}
-                                    </Typography>
-                                </Grid>
-                                <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
-                                        Run Type
-                                    </Typography>
-                                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                                        {getRunTypeLabel(jobStatus?.run_type || mrpRun?.run_type)}
-                                    </Typography>
-                                </Grid>
-                                <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
-                                        Started At
-                                    </Typography>
-                                    <Typography sx={{ fontSize: '0.75rem' }}>
-                                        {formatDate(jobStatus?.started_at)}
-                                    </Typography>
-                                </Grid>
-                                <Grid size={{ xs: 6, sm: 3 }}>
-                                    <Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>
-                                        Completed At
-                                    </Typography>
-                                    <Typography sx={{ fontSize: '0.75rem' }}>
-                                        {formatDate(jobStatus?.completed_at)}
-                                    </Typography>
-                                </Grid>
+                                <Grid size={{ xs: 6, sm: 3 }}><Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>MRP Run ID</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>{jobStatus?.mrp_run_id || mrpRun?.mrp_run_id}</Typography></Grid>
+                                <Grid size={{ xs: 6, sm: 3 }}><Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>Run Type</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>{getRunTypeLabel(jobStatus?.run_type || mrpRun?.run_type)}</Typography></Grid>
+                                <Grid size={{ xs: 6, sm: 3 }}><Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>Started At</Typography><Typography sx={{ fontSize: '0.75rem' }}>{formatDate(jobStatus?.started_at)}</Typography></Grid>
+                                <Grid size={{ xs: 6, sm: 3 }}><Typography sx={{ fontSize: '0.65rem', color: COLORS.text.secondary }}>Completed At</Typography><Typography sx={{ fontSize: '0.75rem' }}>{formatDate(jobStatus?.completed_at)}</Typography></Grid>
                             </Grid>
                         </Paper>
-
-                        {/* Recommendations Section */}
-                        {jobStatus?.recommendations && jobStatus.recommendations.length > 0 && (
-                            <Paper sx={{
-                                p: 2,
-                                bgcolor: COLORS.background.white,
-                                borderRadius: 1.5,
-                                border: `1px solid ${COLORS.border}`,
-                                boxShadow: 'none'
-                            }}>
-                                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.primary, mb: 1.5 }}>
-                                    Recommendations
-                                </Typography>
-
-                                <List dense>
-                                    {jobStatus.recommendations.map((rec, idx) => (
-                                        <ListItem key={idx} sx={{ px: 0 }}>
-                                            <ListItemIcon sx={{ minWidth: 32 }}>
-                                                {rec.type === 'critical' ? (
-                                                    <ErrorIcon sx={{ fontSize: '1rem', color: COLORS.error }} />
-                                                ) : rec.type === 'warning' ? (
-                                                    <WarningIcon sx={{ fontSize: '1rem', color: COLORS.warning }} />
-                                                ) : (
-                                                    <InfoIcon sx={{ fontSize: '1rem', color: COLORS.info }} />
-                                                )}
-                                            </ListItemIcon>
-                                            <ListItemText
-                                                primary={rec.message}
-                                                primaryTypographyProps={{ fontSize: '0.75rem' }}
-                                            />
-                                        </ListItem>
-                                    ))}
-                                </List>
-                            </Paper>
-                        )}
                     </Stack>
                 );
 
@@ -782,196 +491,49 @@ const MrpRun = ({ open, onClose, onRunComplete }) => {
     };
 
     return (
-        <Dialog
-            open={open}
-            onClose={handleClose}
-            maxWidth="md"
-            fullWidth
-            PaperProps={{
-                sx: {
-                    borderRadius: 2,
-                    border: `1px solid ${COLORS.border}`,
-                    overflow: 'hidden',
-                    maxHeight: '90vh'
-                }
-            }}
-        >
-            <DialogTitle sx={{
-                borderBottom: `1px solid ${COLORS.border}`,
-                py: 1.5,
-                px: 2.5,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                bgcolor: COLORS.background.white
-            }}>
+        <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 2, border: `1px solid ${COLORS.border}`, overflow: 'hidden', maxHeight: '90vh' } }}>
+            <DialogTitle sx={{ borderBottom: `1px solid ${COLORS.border}`, py: 1.5, px: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: COLORS.background.white }}>
                 <Stack direction="row" spacing={1} alignItems="center">
                     <FactoryIcon sx={{ color: COLORS.primary, fontSize: '1.2rem' }} />
-                    <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.primary }}>
-                        MRP Run
-                    </Typography>
+                    <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: COLORS.text.primary }}>MRP Run</Typography>
                 </Stack>
-                <IconButton onClick={handleClose} size="small" disabled={loading}>
-                    <CloseIcon fontSize="small" />
-                </IconButton>
+                <IconButton onClick={handleClose} size="small" disabled={loading}><CloseIcon fontSize="small" /></IconButton>
             </DialogTitle>
 
-            {/* Stepper */}
             <Box sx={{ px: 2.5, pt: 2, bgcolor: COLORS.background.white }}>
-                <Stepper
-                    activeStep={activeStep}
-                    alternativeLabel
-                    connector={<ColorConnector />}
-                >
-                    {steps.map((label) => (
-                        <Step key={label}>
-                            <StepLabel>
-                                <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: COLORS.text.secondary }}>
-                                    {label}
-                                </Typography>
-                            </StepLabel>
-                        </Step>
-                    ))}
+                <Stepper activeStep={activeStep} alternativeLabel connector={<ColorConnector />}>
+                    {steps.map((label) => (<Step key={label}><StepLabel><Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: COLORS.text.secondary }}>{label}</Typography></StepLabel></Step>))}
                 </Stepper>
             </Box>
 
             <DialogContent sx={{ p: 2.5, bgcolor: COLORS.background.white }}>
                 {renderStepContent(activeStep)}
-
-                {error && (
-                    <Alert
-                        severity="error"
-                        sx={{
-                            mt: 2,
-                            borderRadius: 1.5,
-                            fontSize: '0.75rem',
-                            py: 0.5
-                        }}
-                    >
-                        {error}
-                    </Alert>
-                )}
+                {error && (<Alert severity="error" sx={{ mt: 2, borderRadius: 1.5, fontSize: '0.75rem', py: 0.5 }}>{error}</Alert>)}
             </DialogContent>
 
-            <DialogActions sx={{
-                px: 2.5,
-                py: 1.5,
-                borderTop: `1px solid ${COLORS.border}`,
-                bgcolor: COLORS.background.white,
-                justifyContent: 'space-between'
-            }}>
-                <Button
-                    onClick={handleClose}
-                    disabled={loading}
-                    size="small"
-                    sx={{
-                        height: 32,
-                        px: 2,
-                        borderRadius: 1.5,
-                        border: `1px solid ${COLORS.border}`,
-                        color: COLORS.text.secondary,
-                        fontSize: '0.7rem',
-                        fontWeight: 500,
-                        textTransform: 'none',
-                        '&:hover': {
-                            borderColor: COLORS.primary,
-                            bgcolor: `${COLORS.primary}10`
-                        }
-                    }}
-                >
+            <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${COLORS.border}`, bgcolor: COLORS.background.white, justifyContent: 'space-between' }}>
+                <Button onClick={handleClose} disabled={loading} size="small" sx={{ height: 32, px: 2, borderRadius: 1.5, border: `1px solid ${COLORS.border}`, color: COLORS.text.secondary, fontSize: '0.7rem', textTransform: 'none' }}>
                     {activeStep === 2 ? 'Close' : 'Cancel'}
                 </Button>
 
                 {activeStep === 0 && (
-                    <Button
-                        variant="contained"
-                        onClick={handleRunMrp}
-                        disabled={loading}
-                        size="small"
-                        startIcon={loading ? <CircularProgress size={16} /> : <PlayIcon sx={{ fontSize: '1rem' }} />}
-                        sx={{
-                            height: 32,
-                            px: 2,
-                            borderRadius: 1.5,
-                            bgcolor: COLORS.primary,
-                            fontSize: '0.7rem',
-                            fontWeight: 500,
-                            textTransform: 'none',
-                            '&:hover': { bgcolor: COLORS.primaryDark }
-                        }}
-                    >
+                    <Button variant="contained" onClick={handleRunMrp} disabled={loading} size="small" startIcon={loading ? <CircularProgress size={16} /> : <PlayIcon sx={{ fontSize: '1rem' }} />} sx={{ height: 32, px: 2, borderRadius: 1.5, bgcolor: COLORS.primary, fontSize: '0.7rem', textTransform: 'none', '&:hover': { bgcolor: COLORS.primaryDark } }}>
                         Run MRP
                     </Button>
                 )}
 
                 {activeStep === 1 && (
-                    <Button
-                        variant="outlined"
-                        onClick={handleReset}
-                        disabled={loading}
-                        size="small"
-                        startIcon={<RefreshIcon sx={{ fontSize: '1rem' }} />}
-                        sx={{
-                            height: 32,
-                            px: 2,
-                            borderRadius: 1.5,
-                            border: `1px solid ${COLORS.border}`,
-                            color: COLORS.text.secondary,
-                            fontSize: '0.7rem',
-                            fontWeight: 500,
-                            textTransform: 'none',
-                            '&:hover': {
-                                borderColor: COLORS.primary,
-                                bgcolor: `${COLORS.primary}10`
-                            }
-                        }}
-                    >
+                    <Button variant="outlined" onClick={handleReset} disabled={loading} size="small" startIcon={<RefreshIcon sx={{ fontSize: '1rem' }} />} sx={{ height: 32, px: 2, borderRadius: 1.5, border: `1px solid ${COLORS.border}`, color: COLORS.text.secondary, fontSize: '0.7rem', textTransform: 'none' }}>
                         New MRP Run
                     </Button>
                 )}
 
                 {activeStep === 2 && (
                     <Stack direction="row" spacing={1}>
-                        <Button
-                            variant="outlined"
-                            onClick={handleReset}
-                            size="small"
-                            startIcon={<RefreshIcon sx={{ fontSize: '1rem' }} />}
-                            sx={{
-                                height: 32,
-                                px: 2,
-                                borderRadius: 1.5,
-                                border: `1px solid ${COLORS.border}`,
-                                color: COLORS.text.secondary,
-                                fontSize: '0.7rem',
-                                fontWeight: 500,
-                                textTransform: 'none',
-                                '&:hover': {
-                                    borderColor: COLORS.primary,
-                                    bgcolor: `${COLORS.primary}10`
-                                }
-                            }}
-                        >
+                        <Button variant="outlined" onClick={handleReset} size="small" startIcon={<RefreshIcon sx={{ fontSize: '1rem' }} />} sx={{ height: 32, px: 2, borderRadius: 1.5, border: `1px solid ${COLORS.border}`, color: COLORS.text.secondary, fontSize: '0.7rem', textTransform: 'none' }}>
                             New MRP Run
                         </Button>
-                        <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<DownloadIcon sx={{ fontSize: '1rem' }} />}
-                            sx={{
-                                height: 32,
-                                px: 2,
-                                borderRadius: 1.5,
-                                bgcolor: COLORS.primary,
-                                fontSize: '0.7rem',
-                                fontWeight: 500,
-                                textTransform: 'none',
-                                '&:hover': { bgcolor: COLORS.primaryDark }
-                            }}
-                            onClick={() => {
-                                showNotification('Export functionality coming soon', 'info');
-                            }}
-                        >
+                        <Button variant="contained" size="small" startIcon={<DownloadIcon sx={{ fontSize: '1rem' }} />} sx={{ height: 32, px: 2, borderRadius: 1.5, bgcolor: COLORS.primary, fontSize: '0.7rem', textTransform: 'none', '&:hover': { bgcolor: COLORS.primaryDark } }} onClick={() => showNotification('Export functionality coming soon', 'info')}>
                             Export Report
                         </Button>
                     </Stack>

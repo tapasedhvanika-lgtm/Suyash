@@ -8,6 +8,7 @@ const {
   getPurchaseRequisitionById,
   updatePurchaseRequisition,
   hardDeletePurchaseRequisition,
+  bulkDeletePurchaseRequisitions,
   // Approval Actions
   approvePurchaseRequisition,
   rejectPurchaseRequisition,
@@ -953,5 +954,11 @@ router.put('/:id/approve', protect, approvePurchaseRequisition);
 router.put('/:id/reject', protect, rejectPurchaseRequisition);
 
 router.delete('/:id/permanent', hardDeletePurchaseRequisition);
+router.post(
+  '/bulk-delete',
+  protect,
+  bulkDeletePurchaseRequisitions
+);
+
 
 module.exports = router;

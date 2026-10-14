@@ -1,25 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Paper,
-  Grid,
-  Typography,
-  Stack,
   CircularProgress,
   Alert,
   Snackbar,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Chip,
   LinearProgress,
-  TextField,
-  Button,
-  IconButton,
-  Tooltip
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import {
   Receipt as ReceiptIcon,
@@ -73,16 +60,17 @@ const SOSummary = () => {
   const [toDate, setToDate] = useState(getTodayDate());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  // Initial fetch on mount
   useEffect(() => {
-    fetchSummary();
+    fetchSummary(getLastMonthDate(), getTodayDate());
   }, []);
 
-  const fetchSummary = async () => {
+  const fetchSummary = async (from, to) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `${BASE_URL}/api/sales-orders/reports/summary?from=${fromDate}&to=${toDate}`,
+        `${BASE_URL}/api/sales-orders/reports/summary?from=${from}&to=${to}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -105,17 +93,17 @@ const SOSummary = () => {
         showNotification('From date cannot be greater than To date', 'error');
         return;
       }
-      fetchSummary();
+      fetchSummary(fromDate, toDate);
       showNotification('Data updated successfully', 'success');
     }
   };
 
   const handleReset = () => {
-    setFromDate(getLastMonthDate());
-    setToDate(getTodayDate());
-    setTimeout(() => {
-      fetchSummary();
-    }, 100);
+    const defaultFrom = getLastMonthDate();
+    const defaultTo = getTodayDate();
+    setFromDate(defaultFrom);
+    setToDate(defaultTo);
+    fetchSummary(defaultFrom, defaultTo);
     showNotification('Reset to default date range', 'success');
   };
 
@@ -147,30 +135,22 @@ const SOSummary = () => {
     { 
       label: "Total Orders", 
       value: totalOrders.toLocaleString(), 
-      change: "+12.5%", 
       icon: <ReceiptIcon sx={{ fontSize: '1rem', color: 'white' }} />,
-      trend: "up"
     },
     { 
       label: "Total Revenue", 
       value: formatCurrency(totalValue), 
-      change: "+8.2%", 
       icon: <MoneyIcon sx={{ fontSize: '1rem', color: 'white' }} />,
-      trend: "up"
     },
     { 
       label: "Average Order Value", 
       value: formatCurrency(avgOrderValue), 
-      change: "+5.4%", 
       icon: <TrendingUpIcon sx={{ fontSize: '1rem', color: 'white' }} />,
-      trend: "up"
     },
     { 
       label: "Active Customers", 
       value: totalCustomers, 
-      change: "+15.3%", 
       icon: <BusinessIcon sx={{ fontSize: '1rem', color: 'white' }} />,
-      trend: "up"
     },
   ];
 
@@ -245,23 +225,6 @@ const SOSummary = () => {
                     <div>
                       <p className="text-[11px] font-medium text-[#4B5568] uppercase tracking-wider">{stat.label}</p>
                       <p className="text-xl font-bold text-[#151C26] mt-0.5">{stat.value}</p>
-                      <div className="flex items-center gap-1 mt-1.5">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex items-center gap-0.5 ${
-                          stat.trend === 'up' ? 'bg-[#9FE2BF] text-[#063B3E]' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {stat.trend === 'up' ? (
-                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                            </svg>
-                          ) : (
-                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                            </svg>
-                          )}
-                          {stat.change}
-                        </span>
-                        <span className="text-[10px] text-[#94A3B8]">from last period</span>
-                      </div>
                     </div>
                     <div className="w-10 h-10 rounded-lg bg-[#074346] flex items-center justify-center shadow-sm">
                       {stat.icon}
@@ -275,6 +238,7 @@ const SOSummary = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {summaryData.by_status?.map((status, idx) => {
                 const config = statusConfig[status._id] || statusConfig['Draft'];
+                const percentage = totalValue > 0 ? ((status.value / totalValue) * 100).toFixed(1) : 0;
                 return (
                   <div key={idx} className="bg-white rounded-lg p-4 border border-[#E3E8EF] shadow-sm">
                     <div className="flex items-center justify-between">
@@ -289,14 +253,14 @@ const SOSummary = () => {
                         <p className="text-xs text-[#94A3B8] mt-0.5">{formatCurrency(status.value)}</p>
                       </div>
                       <Chip 
-                        label={`${((status.value / totalValue) * 100).toFixed(1)}%`}
+                        label={`${percentage}%`}
                         size="small"
                         sx={{ bgcolor: config.bg, color: config.color, fontSize: '0.7rem' }}
                       />
                     </div>
                     <LinearProgress 
                       variant="determinate" 
-                      value={(status.value / totalValue) * 100} 
+                      value={Number(percentage)} 
                       sx={{ mt: 1.5, height: 4, borderRadius: 2, bgcolor: '#F3F4F6', '& .MuiLinearProgress-bar': { bgcolor: config.color, borderRadius: 2 } }}
                     />
                   </div>
@@ -325,7 +289,7 @@ const SOSummary = () => {
                   </thead>
                   <tbody>
                     {summaryData.by_month?.map((month, idx) => {
-                      const percentage = (month.total_value / totalValue) * 100;
+                      const percentage = totalValue > 0 ? (month.total_value / totalValue) * 100 : 0;
                       return (
                         <tr key={idx} className="border-b border-[#F2F5F8] last:border-0 hover:bg-[#F8FFFC] transition-colors">
                           <td className="p-3 text-xs font-medium text-[#151C26]">{formatMonth(month._id)}</td>
@@ -374,7 +338,7 @@ const SOSummary = () => {
                   </thead>
                   <tbody>
                     {summaryData.by_customer?.map((customer, idx) => {
-                      const percentage = (customer.total_value / totalValue) * 100;
+                      const percentage = totalValue > 0 ? (customer.total_value / totalValue) * 100 : 0;
                       return (
                         <tr key={idx} className="border-b border-[#F2F5F8] last:border-0 hover:bg-[#F8FFFC] transition-colors">
                           <td className="p-3">

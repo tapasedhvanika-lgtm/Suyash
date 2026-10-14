@@ -6,7 +6,8 @@ const {
   performThreeWayMatch,
   approvePurchaseInvoice,
   getAllPurchaseInvoices,
-  getPurchaseInvoiceById
+  getPurchaseInvoiceById,
+  bulkDeletePurchaseInvoices
 } = require('../../controllers/Procurement/purchaseInvoiceController');
 
 const { protect, authorize } = require('../../middleware/authMiddleware');
@@ -591,5 +592,6 @@ router.put('/:id/three-way-match',  performThreeWayMatch);
  *         description: Server error
  */
 router.put('/:id/approve', approvePurchaseInvoice);
+router.post('/bulk-delete', bulkDeletePurchaseInvoices);
 
 module.exports = router;
