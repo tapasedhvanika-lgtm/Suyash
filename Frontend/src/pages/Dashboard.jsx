@@ -3,9 +3,38 @@ import React, { useState } from 'react'
 import LineChart from '../components/LineChart'
 import BarChart from '../components/BarChart'
 import DoughnutChart from '../components/DoughnutChart'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const Dashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('Last 30 days')
+
+  const handleGenerateReport = () => {
+  const doc = new jsPDF()
+
+  doc.setFontSize(18)
+  doc.text('Suyash Enterprises - Dashboard Report', 14, 20)
+
+  doc.setFontSize(11)
+  doc.text(`Report Period: ${selectedPeriod}`, 14, 30)
+  doc.text(
+    `Generated On: ${new Date().toLocaleDateString('en-IN')}`,
+    14,
+    38
+  )
+
+  autoTable(doc, {
+    startY: 48,
+    head: [['Metric', 'Value', 'Change']],
+    body: stats.map((stat) => [
+      stat.label,
+      stat.value,
+      stat.change,
+    ]),
+  })
+
+  doc.save('Suyash_Dashboard_Report.pdf')
+}
 
   const stats = [
     { 
@@ -129,7 +158,12 @@ const Dashboard = () => {
               <option>Last 3 months</option>
               <option>Last year</option>
             </select>
-            <button className="px-3 py-1.5 text-xs bg-[#074346] text-white rounded-md hover:from-[#8ED1AE] hover:to-[#094B4F] transition-all font-medium flex items-center gap-1.5 shadow-sm">
+            
+<button
+  onClick={handleGenerateReport}
+  className="px-3 py-1.5 text-xs bg-[#074346] text-white rounded-md hover:from-[#8ED1AE] hover:to-[#094B4F] transition-all font-medium flex items-center gap-1.5 shadow-sm"
+>
+
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
