@@ -11,6 +11,8 @@
 // UPDATED: Added dispatchSalesOrderItems for ViewOrderModal dispatch feature.
 // UPDATED: Fixed getReportSummary date filter to include the entire 'to' day.
 // UPDATED: Added _id to getReportPendingDelivery so frontend can open ViewOrderModal.
+// ✅ UPDATED: Bypassed strict Tax Master validation in validateAndEnrichItems. 
+//             Defaults to 0% GST if no HSN tax config is found.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const mongoose   = require('mongoose');
@@ -150,11 +152,11 @@ async function fetchItemDetails(itemId) {
   });
   
   return {
+    _id: item._id,
     part_no: item.part_no,
     part_name: item.part_name,
     unit: item.unit,
     hsn_code: item.hsn_code,
-    // REMOVED: gst_percentage - now fetched from Tax Master
     drawing_no: item.drawing_no || '',
     revision_no: item.revision_no || '0',
   };
@@ -184,13 +186,18 @@ async function validateAndEnrichItems(items) {
       // Fetch details from Item Master using item_id
       const masterDetails = await fetchItemDetails(item.item_id);
 
-      // ✅ NEW: Fetch GST from Tax Master using HSN code
-      const tax = await Tax.findOne({ HSNCode: masterDetails.hsn_code, IsActive: true });
-      if (!tax) {
-        throw new Error(`No tax configuration found for HSN code: ${masterDetails.hsn_code}. Please add it in Tax Master first.`);
+      // ✅ FIX: Fetch GST from Tax Master, but DO NOT block if not found. Default to 0%.
+      let gstPercentage = 0;
+      try {
+        const tax = await Tax.findOne({ HSNCode: masterDetails.hsn_code, IsActive: true });
+        if (tax) {
+          gstPercentage = tax.GSTPercentage;
+        } else {
+          console.warn(`[validateAndEnrichItems] No tax config found for HSN code: ${masterDetails.hsn_code}. Defaulting to 0% GST.`);
+        }
+      } catch (taxError) {
+        console.warn(`[validateAndEnrichItems] Error fetching tax config for HSN: ${masterDetails.hsn_code}. Defaulting to 0% GST.`, taxError.message);
       }
-      
-      const gstPercentage = tax.GSTPercentage;
       
       console.log(`[validateAndEnrichItems] Item: ${masterDetails.part_no}, HSN: ${masterDetails.hsn_code}, GST: ${gstPercentage}%`);
 
@@ -201,7 +208,7 @@ async function validateAndEnrichItems(items) {
         part_name: masterDetails.part_name,
         hsn_code: masterDetails.hsn_code,
         unit: masterDetails.unit,
-        gst_percentage: gstPercentage,  // ← FROM TAX MASTER
+        gst_percentage: gstPercentage,  // ← FROM TAX MASTER OR 0%
         drawing_no: masterDetails.drawing_no,
         revision_no: masterDetails.revision_no,
         ordered_qty: Number(item.ordered_qty),
@@ -1484,11 +1491,9 @@ const getReportSummary = async (req, res) => {
     if (from || to) {
       match.so_date = {};
       if (from) match.so_date.$gte = new Date(from);
-      // ✅ FIX: Include the entire 'to' day (up to 23:59:59) so orders on that day are counted
       if (to)   match.so_date.$lte = new Date(new Date(to).setHours(23, 59, 59, 999));
     }
 
-    // ✅ FIX: Use the SAME match for byStatus so all cards are consistent with the date filter
     const matchForStatus = { ...match };
 
     const [byCustomer, byMonth, byStatus, total] = await Promise.all([
@@ -1516,7 +1521,7 @@ const getReportSummary = async (req, res) => {
       ]),
 
       SalesOrder.aggregate([
-        { $match: matchForStatus }, // ✅ Now uses the same date filter
+        { $match: matchForStatus },
         { $group: {
           _id:   '$status',
           count: { $sum: 1 },
@@ -1556,12 +1561,10 @@ const updateSalesOrderStatus = async (req, res) => {
     const { status, cancellation_reason, notes } = req.body;
     const userId = req.user?._id;
 
-    // Auth check
     if (!userId) {
       return err(res, 'Authentication required', 401);
     }
 
-    // Validate status
     if (!status) {
       return err(res, 'Status field is required', 400);
     }
@@ -1570,7 +1573,6 @@ const updateSalesOrderStatus = async (req, res) => {
       return err(res, `Invalid status. Allowed: ${SO_STATUSES.join(', ')}`, 400);
     }
 
-    // Find sales order
     const salesOrder = await SalesOrder.findById(id);
     if (!salesOrder) {
       return err(res, 'Sales order not found', 404);
@@ -1582,7 +1584,6 @@ const updateSalesOrderStatus = async (req, res) => {
 
     const currentStatus = salesOrder.status;
 
-    // Check transition validity
     const isValidTransition = SalesOrder.isValidTransition(currentStatus, status);
     if (!isValidTransition) {
       const validNextStatuses = SalesOrder.validNextStatuses(currentStatus);
@@ -1593,11 +1594,9 @@ const updateSalesOrderStatus = async (req, res) => {
       );
     }
 
-    // =========================================================================
-    // NOTE: LINE ITEM VALIDATIONS HAVE BEEN COMMENTED OUT SO YOU CAN 
-    // OVERRIDE THE STATUS FROM THE FRONTEND WITHOUT DISPATCHING ITEMS FIRST.
-    // UNCOMMENT THESE BLOCKS IF YOU WANT TO ENFORCE STRICT BUSINESS LOGIC LATER.
-    // =========================================================================
+    /* 
+    NOTE: LINE ITEM VALIDATIONS HAVE BEEN COMMENTED OUT
+    */
     
     /*
     if (status === 'Ready for Dispatch') {
@@ -1635,7 +1634,6 @@ const updateSalesOrderStatus = async (req, res) => {
     }
     */
 
-    // Prepare update data
     const updateData = { status, updated_by: userId };
     
     if (status === 'Confirmed' && !salesOrder.confirmed_at) {
@@ -1652,7 +1650,6 @@ const updateSalesOrderStatus = async (req, res) => {
       }
       updateData.cancellation_reason = cancellation_reason;
       
-      // Cancel all non-delivered items
       let itemsCancelled = false;
       salesOrder.items.forEach(item => {
         if (!item.is_cancelled && item.item_status !== 'Delivered') {
@@ -1665,11 +1662,10 @@ const updateSalesOrderStatus = async (req, res) => {
       });
       
       if (itemsCancelled) {
-        await salesOrder.save(); // Recalculates totals
+        await salesOrder.save(); 
       }
     }
 
-    // Update sales order
     const updatedSalesOrder = await SalesOrder.findByIdAndUpdate(
       id,
       {
@@ -1783,7 +1779,6 @@ const deleteSalesOrder = async (req, res) => {
     const so = await SalesOrder.findOne({ _id: req.params.id, is_active: true });
     if (!so) return err(res, 'Sales Order not found', 404);
 
-    // ✅ UPDATED: Allow deletion of Draft, Cancelled, Closed, or Confirmed orders
     if (!['Draft', 'Cancelled', 'Closed', 'Confirmed'].includes(so.status)) {
       return err(
         res, 
@@ -1792,7 +1787,6 @@ const deleteSalesOrder = async (req, res) => {
       );
     }
 
-    // Check if any linked records exist (optional - prevents orphaned references)
     const WorkOrder = mongoose.model('WorkOrder');
     const workOrdersExist = await WorkOrder.exists({ so_id: so._id });
     
@@ -1804,7 +1798,6 @@ const deleteSalesOrder = async (req, res) => {
       );
     }
 
-    // Hard delete - remove from database
     await SalesOrder.deleteOne({ _id: so._id });
 
     console.log(`[deleteSalesOrder] SO ${so.so_number} deleted by user ${req.user._id}`);
@@ -1831,21 +1824,17 @@ const bulkDeleteSalesOrders = async (req, res) => {
   try {
     const { ids } = req.body; // Frontend should send: { ids: ["id1", "id2"] }
 
-    // 1. Validate payload
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return err(res, 'Please provide a non-empty array of Sales Order IDs.', 400);
     }
 
-    // 2. Validate ObjectIds
     const invalidIds = ids.filter(id => !mongoose.Types.ObjectId.isValid(id));
     if (invalidIds.length > 0) {
       return err(res, `Invalid Sales Order ID(s): ${invalidIds.join(', ')}`, 400);
     }
 
-    // 3. Fetch orders to check business rules
     const orders = await SalesOrder.find({ _id: { $in: ids }, is_active: true });
     
-    // ✅ UPDATED: Allow deletion of Draft, Cancelled, Closed, or Confirmed orders
     const blockedOrders = orders.filter(so => !['Draft', 'Cancelled', 'Closed', 'Confirmed'].includes(so.status));
     if (blockedOrders.length > 0) {
       const blockedNumbers = blockedOrders.map(o => `${o.so_number} (${o.status})`).join(', ');
@@ -1856,7 +1845,6 @@ const bulkDeleteSalesOrders = async (req, res) => {
       );
     }
 
-    // 4. Perform hard delete
     const result = await SalesOrder.deleteMany({ _id: { $in: ids } });
 
     console.log(`[bulkDeleteSalesOrders] Deleted ${result.deletedCount} SOs by user ${req.user._id}`);
