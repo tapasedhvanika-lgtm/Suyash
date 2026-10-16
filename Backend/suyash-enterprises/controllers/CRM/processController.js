@@ -303,6 +303,83 @@ const deleteProcess = async (req, res) => {
   }
 };
 
+
+const bulkDeleteProcesses = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an array of process IDs'
+      });
+    }
+
+    const invalidIds = ids.filter(id => !require('mongoose').isValidObjectId(id));
+
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'One or more process IDs are invalid',
+        invalidIds
+      });
+    }
+
+    const Routing = require('../../models/CRM/Routing');
+
+    const processes = await Process.find({
+      _id: { $in: ids },
+      is_active: true
+    });
+
+    const blocked = [];
+    const eligibleIds = [];
+
+    for (const process of processes) {
+      const routingCount = await Routing.countDocuments({
+        'operations.process_id': process._id,
+        is_active: true
+      });
+
+      if (routingCount > 0) {
+        blocked.push({
+          id: process._id,
+          process_name: process.process_name,
+          reason: `Used in ${routingCount} active routing(s)`
+        });
+      } else {
+        eligibleIds.push(process._id);
+      }
+    }
+
+    if (eligibleIds.length > 0) {
+      await Process.updateMany(
+        { _id: { $in: eligibleIds } },
+        {
+          $set: {
+            is_active: false,
+            updated_by: req.user._id
+          }
+        }
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: `${eligibleIds.length} process(es) deactivated`,
+      deactivatedCount: eligibleIds.length,
+      blocked
+    });
+  } catch (error) {
+    console.error('Bulk delete processes error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while deactivating processes'
+    });
+  }
+};
+
+
 // @desc    Get processes for dropdown
 // @route   GET /api/processes/dropdown
 // @access  Private
@@ -331,12 +408,14 @@ const getProcessesDropdown = async (req, res) => {
   }
 };
 
+
 module.exports = {
   getProcesses,
   getProcess,
   createProcess,
   updateProcess,
   deleteProcess,
+  bulkDeleteProcesses,
   getProcessesDropdown,
   getProcessesByCategory
 };
