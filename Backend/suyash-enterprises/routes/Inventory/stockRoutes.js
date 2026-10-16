@@ -1,4 +1,4 @@
-// routes/Inventory/stockLedgerRoutes.js
+// routes/Inventory/stockRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -847,21 +847,21 @@ router.get('/stock-transactions/batch-trace/:batch_no', getBatchTraceability);
  *                 success:
  *                   type: boolean
  *                   example: true
- *                                data:
-                  type: object
-                  properties:
-                    days_30_60:
-                      type: array
-                      description: Items not moved for 30-60 days
-                    days_60_90:
-                      type: array
-                      description: Items not moved for 60-90 days
-                    days_90_180:
-                      type: array
-                      description: Items not moved for 90-180 days
-                    days_180_plus:
-                      type: array
-                      description: Items not moved for 180+ days
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     days_30_60:
+ *                       type: array
+ *                       description: Items not moved for 30-60 days
+ *                     days_60_90:
+ *                       type: array
+ *                       description: Items not moved for 60-90 days
+ *                     days_90_180:
+ *                       type: array
+ *                       description: Items not moved for 90-180 days
+ *                     days_180_plus:
+ *                       type: array
+ *                       description: Items not moved for 180+ days
  *                 summary:
  *                   type: object
  *                   properties:

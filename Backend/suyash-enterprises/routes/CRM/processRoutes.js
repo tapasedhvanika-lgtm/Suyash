@@ -8,6 +8,7 @@ const {
   createProcess,
   updateProcess,
   deleteProcess,
+  bulkDeleteProcesses,
   getProcessesDropdown,
   getProcessesByCategory
 } = require('../../controllers/CRM/processController');
@@ -15,7 +16,7 @@ const { protect } = require('../../middleware/authMiddleware');
 
 // All routes are protected
 router.use(protect);
-
+router.post('/bulk-delete', bulkDeleteProcesses);
 /**
  * @swagger
  * tags:
