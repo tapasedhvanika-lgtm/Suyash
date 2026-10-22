@@ -1163,12 +1163,12 @@ const AccessDenied = () => (
   </Box>
 );
 
-// ==================== ACTION MENU COMPONENT - WITH CORRECT PERMISSIONS ====================
+// ==================== ACTION MENU COMPONENT ====================
 const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete, onPost, onPrint, permissions, isSuperAdmin }) => {
   const isDraft = item.status === MIV_STATUS.DRAFT;
   const isIssued = item.status === MIV_STATUS.ISSUED;
   
-  // Permission checks - USING CORRECT MODULE AND PAGE
+  // Permission checks
   const canView = isSuperAdmin || hasPermission(permissions, MODULES.INVENTORY_MANAGEMENT, PAGES.MIV_MASTER, ACTIONS.VIEW);
   const canUpdate = isSuperAdmin || hasPermission(permissions, MODULES.INVENTORY_MANAGEMENT, PAGES.MIV_MASTER, ACTIONS.UPDATE);
   const canDelete = isSuperAdmin || hasPermission(permissions, MODULES.INVENTORY_MANAGEMENT, PAGES.MIV_MASTER, ACTIONS.DELETE);
@@ -1209,7 +1209,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
           }
         }}
       >
-        {/* View Details - VIEW permission */}
+        {/* View Details */}
         {canView && (
           <MenuItem onClick={() => { onView(item); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}>
@@ -1223,7 +1223,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
           </MenuItem>
         )}
         
-        {/* Edit - UPDATE permission, only for Draft */}
+        {/* Edit */}
         {canUpdate && isDraft && (
           <MenuItem onClick={() => { onEdit(item); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: COLORS.primary, minWidth: 36 }}>
@@ -1237,7 +1237,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
           </MenuItem>
         )}
         
-        {/* Post & Issue - CREATE permission, only for Draft */}
+        {/* Post & Issue */}
         {canCreate && isDraft && (
           <MenuItem onClick={() => { onPost(item); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: '#10B981', minWidth: 36 }}>
@@ -1251,7 +1251,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
           </MenuItem>
         )}
         
-        {/* Print MIV - PRINT permission, only for Draft or Issued */}
+        {/* Print MIV */}
         {canPrint && (isDraft || isIssued) && (
           <MenuItem onClick={() => { onPrint(item); onClose(); }} sx={{ py: 1.5 }}>
             <ListItemIcon sx={{ color: '#F59E0B', minWidth: 36 }}>
@@ -1265,7 +1265,7 @@ const ActionMenu = ({ item, anchorEl, onOpen, onClose, onView, onEdit, onDelete,
           </MenuItem>
         )}
         
-        {/* Cancel/Delete - DELETE permission, only for Draft */}
+        {/* Cancel/Delete */}
         {canDelete && isDraft && (
           <>
             <Divider sx={{ my: 0.5 }} />
@@ -1351,7 +1351,7 @@ const MIVMaster = () => {
     fetchUserPermissions();
   }, []);
 
-  // Check permission helper - USING CORRECT MODULE AND PAGE
+  // Check permission helper
   const checkPermission = (action) => {
     if (isSuperAdmin) return true;
     return hasPermission(
@@ -1451,7 +1451,7 @@ const MIVMaster = () => {
     showNotification('Data refreshed', 'success');
   };
 
-  // Handle select all - only if user has delete permission
+  // Handle select all
   const handleSelectAll = (event) => {
     if (!canDelete) return;
     if (event.target.checked) {
@@ -1461,7 +1461,7 @@ const MIVMaster = () => {
     }
   };
 
-  // Handle single selection - only if user has delete permission
+  // Handle single selection
   const handleSelect = (id) => {
     if (!canDelete) return;
     const selectedIndex = selected.indexOf(id);
@@ -1742,7 +1742,6 @@ const MIVMaster = () => {
           />
 
           <Stack direction="row" spacing={1.5}>
-            {/* Refresh Button */}
             <Tooltip title="Refresh">
               <IconButton
                 size="small"
@@ -1759,7 +1758,6 @@ const MIVMaster = () => {
               </IconButton>
             </Tooltip>
 
-            {/* Bulk Delete Button - Only show if user has delete permission */}
             {canDelete && selected.length > 0 && (
               <Button
                 variant="outlined"
@@ -1785,7 +1783,6 @@ const MIVMaster = () => {
               </Button>
             )}
             
-            {/* Summary Report Button - Only show if user has view permission */}
             {canViewPage && (
               <Button
                 variant="outlined"
@@ -1809,7 +1806,6 @@ const MIVMaster = () => {
               </Button>
             )}
             
-            {/* Add MIV Button - Only show if user has create permission */}
             {canCreate && (
               <Button
                 variant="contained"
@@ -1855,7 +1851,6 @@ const MIVMaster = () => {
                   py: 1.5,
                 }
               }}>
-                {/* Checkbox Column - Only show if user has delete permission */}
                 {canDelete && (
                   <TableCell padding="checkbox" sx={{ width: 40 }}>
                     <Checkbox
@@ -1878,30 +1873,14 @@ const MIVMaster = () => {
                     />
                   </TableCell>
                 )}
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                  MIV No.
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                  Work Order
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                  Department
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                  Issued By
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                  Items
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                  Total Cost
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                  Status
-                </TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', width: 60 }} align="center">
-                  Actions
-                </TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>MIV No.</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>Work Order</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>Department</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>Issued By</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>Items</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>Total Cost</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px' }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.5px', width: 60 }} align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1909,9 +1888,7 @@ const MIVMaster = () => {
                 <TableRow>
                   <TableCell colSpan={canDelete ? 9 : 8} align="center" sx={{ py: 6 }}>
                     <CircularProgress size={32} sx={{ color: COLORS.primary }} />
-                    <Typography sx={{ fontSize: '0.75rem', mt: 1, color: COLORS.text.secondary }}>
-                      Loading MIVs...
-                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', mt: 1, color: COLORS.text.secondary }}>Loading MIVs...</Typography>
                   </TableCell>
                 </TableRow>
               ) : data.length === 0 ? (
@@ -1944,7 +1921,6 @@ const MIVMaster = () => {
                         }
                       }}
                     >
-                      {/* Checkbox Column - Only show if user has delete permission */}
                       {canDelete && (
                         <TableCell padding="checkbox">
                           <Checkbox
@@ -1952,12 +1928,8 @@ const MIVMaster = () => {
                             onChange={() => handleSelect(item._id)}
                             sx={{
                               color: COLORS.primary,
-                              '&.Mui-checked': {
-                                color: COLORS.primary,
-                              },
-                              '& .MuiSvgIcon-root': {
-                                fontSize: '1.25rem'
-                              }
+                              '&.Mui-checked': { color: COLORS.primary },
+                              '& .MuiSvgIcon-root': { fontSize: '1.25rem' }
                             }}
                           />
                         </TableCell>
@@ -1988,9 +1960,7 @@ const MIVMaster = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography sx={{ fontSize: '0.75rem' }}>
-                          {getPersonName(item.issued_by)}
-                        </Typography>
+                        <Typography sx={{ fontSize: '0.75rem' }}>{getPersonName(item.issued_by)}</Typography>
                       </TableCell>
                       <TableCell>
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
@@ -2056,97 +2026,42 @@ const MIVMaster = () => {
         />
       </Paper>
 
-      {/* Modals - Only render if user has appropriate permissions */}
+      {/* Modals */}
       {canCreate && (
-        <AddMIV
-          open={openAddModal}
-          onClose={() => setOpenAddModal(false)}
-          onAdd={handleAddMIV}
-        />
+        <AddMIV open={openAddModal} onClose={() => setOpenAddModal(false)} onAdd={handleAddMIV} />
       )}
       
       {selectedItem && (
         <>
           {canViewPage && (
-            <ViewMIV
-              open={openViewModal}
-              onClose={() => {
-                setOpenViewModal(false);
-                setSelectedItem(null);
-              }}
-              data={selectedItem}
-            />
+            <ViewMIV open={openViewModal} onClose={() => { setOpenViewModal(false); setSelectedItem(null); }} data={selectedItem} />
           )}
           
           {canUpdate && (
-            <EditMIV
-              open={openEditModal}
-              onClose={() => {
-                setOpenEditModal(false);
-                setSelectedItem(null);
-              }}
-              data={selectedItem}
-              onUpdate={handleEditMIV}
-            />
+            <EditMIV open={openEditModal} onClose={() => { setOpenEditModal(false); setSelectedItem(null); }} data={selectedItem} onUpdate={handleEditMIV} />
           )}
           
           {canDelete && (
-            <DeleteMIV
-              open={openDeleteDialog}
-              onClose={() => {
-                setOpenDeleteDialog(false);
-                setSelectedItem(null);
-              }}
-              mivData={selectedItem}
-              onDelete={handleDeleteMIV}
-            />
+            <DeleteMIV open={openDeleteDialog} onClose={() => { setOpenDeleteDialog(false); setSelectedItem(null); }} mivData={selectedItem} onDelete={handleDeleteMIV} />
           )}
           
           {canCreate && (
-            <PostMIV
-              open={openPostDialog}
-              onClose={() => {
-                setOpenPostDialog(false);
-                setSelectedItem(null);
-              }}
-              data={selectedItem}
-              onPost={handlePostMIV}
-            />
+            <PostMIV open={openPostDialog} onClose={() => { setOpenPostDialog(false); setSelectedItem(null); }} data={selectedItem} onPost={handlePostMIV} />
           )}
           
           {canPrint && (
-            <PrintMIV
-              open={openPrintModal}
-              onClose={() => {
-                setOpenPrintModal(false);
-                setSelectedItem(null);
-              }}
-              data={selectedItem}
-            />
+            <PrintMIV open={openPrintModal} onClose={() => { setOpenPrintModal(false); setSelectedItem(null); }} data={selectedItem} />
           )}
         </>
       )}
       
       {canViewPage && (
-        <MIVSummary
-          open={openSummaryModal}
-          onClose={() => setOpenSummaryModal(false)}
-        />
+        <MIVSummary open={openSummaryModal} onClose={() => setOpenSummaryModal(false)} />
       )}
       
       {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          variant="filled"
-          sx={{ borderRadius: 1.5, fontSize: '0.75rem' }}
-        >
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} variant="filled" sx={{ borderRadius: 1.5, fontSize: '0.75rem' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
