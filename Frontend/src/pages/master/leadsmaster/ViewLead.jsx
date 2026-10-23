@@ -343,9 +343,9 @@ const ViewLead = ({ open, onClose, lead }) => {
                     <TableHead sx={{ bgcolor: COLORS.background.light }}>
                       <TableRow>
                         <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600 }}>Description</TableCell>
-                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, align: 'right' }}>Qty</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600,}}>Qty</TableCell>
                         <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600 }}>Unit</TableCell>
-                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600, align: 'right' }}>Target Price</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600,}}>Target Price</TableCell>
                         <TableCell sx={{ fontSize: '0.7rem', fontWeight: 600 }}>Material Grade</TableCell>
                       </TableRow>
                     </TableHead>
@@ -353,9 +353,9 @@ const ViewLead = ({ open, onClose, lead }) => {
                       {lead.enquired_items.map((item, idx) => (
                         <TableRow key={idx}>
                           <TableCell sx={{ fontSize: '0.75rem' }}>{item.description}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right' }}>{item.quantity}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem',}}>{item.quantity}</TableCell>
                           <TableCell sx={{ fontSize: '0.75rem' }}>{item.unit}</TableCell>
-                          <TableCell sx={{ fontSize: '0.75rem', textAlign: 'right' }}>{item.target_price ? `₹${item.target_price}` : '-'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.75rem',}}>{item.target_price ? `₹${item.target_price}` : '-'}</TableCell>
                           <TableCell sx={{ fontSize: '0.75rem' }}>{item.material_grade || '-'}</TableCell>
                         </TableRow>
                       ))}
