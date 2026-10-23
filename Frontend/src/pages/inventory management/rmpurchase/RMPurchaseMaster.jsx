@@ -499,7 +499,6 @@ const RMPurchaseMaster = () => {
                 <th className={th}>RM Type</th>
                 <th className={th}>Name / Code</th>
                 <th className={th}>Quantity</th>
-                <th className={th}>Remaining Qty</th> {/* 👈 NAYA COLUMN */}
                 <th className={th}>Party Name</th>
                 <th className={th}>Invoice No</th>
                 <th className={`${th} text-center w-[60px]`}>Actions</th>
@@ -508,14 +507,14 @@ const RMPurchaseMaster = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center"> {/* 👈 colSpan 8 se 9 kiya */}
+                  <td colSpan={8} className="py-12 text-center">
                     <CircularProgress size={32} sx={{ color: COLORS.primary }} />
                     <div className="text-[0.75rem] mt-2">Loading purchases...</div>
                   </td>
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center"> {/* 👈 colSpan 8 se 9 kiya */}
+                  <td colSpan={8} className="py-12 text-center">
                     <EmptyIcon sx={{ fontSize: 48, color: COLORS.tertiary }} />
                     <div className="text-[0.875rem] text-[#4B5568]">
                       {search ? 'No purchases found' : 'No purchases available'}
@@ -549,13 +548,6 @@ const RMPurchaseMaster = () => {
                         </div>
                       </td>
                       <td className={`${td} font-medium`}>{item.quantity} <span className="text-[#94A3B8]">{item.unit}</span></td>
-                      
-                      {/* 👇 NAYA DATA COLUMN (Remaining Qty) 👇 */}
-                      <td className={`${td} font-bold ${item.remaining_quantity > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                        {item.remaining_quantity !== undefined ? item.remaining_quantity : item.quantity} 
-                        <span className="text-[#94A3B8] font-normal"> {item.unit}</span>
-                      </td>
-                      
                       <td className={td}>{item.party_name}</td>
                       <td className={td}>{item.invoice_no}</td>
                       <td className={`${td} text-center`}>
@@ -627,7 +619,6 @@ const RMPurchaseMaster = () => {
             ['Material Name', viewEntry.name],
             ['Material Code', viewEntry.code],
             ['Quantity', `${viewEntry.quantity} ${viewEntry.unit}`],
-            ['Remaining Qty', `${viewEntry.remaining_quantity !== undefined ? viewEntry.remaining_quantity : viewEntry.quantity} ${viewEntry.unit}`], // 👈 View me bhi add kiya
             ['Party Name', viewEntry.party_name],
             ['Invoice No', viewEntry.invoice_no]
           ].map(([label, value]) => (
