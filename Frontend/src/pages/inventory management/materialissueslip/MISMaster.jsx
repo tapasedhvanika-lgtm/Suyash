@@ -1,188 +1,3 @@
-// import React, { useState, useEffect } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import axios from 'axios';
-// // 👇 Edit icon import kiya gaya hai
-// import { Plus, Search, Printer, X, RefreshCw, Edit } from 'lucide-react';
-
-// const MISMaster = () => {
-//   const navigate = useNavigate();
-//   const [data, setData] = useState([]);
-//   const [loading, setLoading] = useState(false);
-//   const [search, setSearch] = useState('');
-//   const [printEntry, setPrintEntry] = useState(null);
-
-//   const fetchData = async () => {
-//     setLoading(true);
-//     try {
-//       const token = localStorage.getItem('token');
-//       const res = await axios.get(`http://localhost:5009/api/material-issue-slip?search=${search}`, {
-//         headers: { Authorization: `Bearer ${token}` }
-//       });
-//       setData(res.data.data);
-//     } catch (error) {
-//       console.error(error);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   useEffect(() => { fetchData(); }, [search]);
-
-//   const handlePrint = () => {
-//     window.print();
-//   };
-
-//   return (
-//     <div className="p-6 bg-[#F8F9FA] min-h-screen font-sans">
-      
-//       <div className="mb-6">
-//         <h1 className="text-2xl font-bold text-gray-800">Material Issue Slips</h1>
-//         <p className="text-gray-500 text-sm mt-1">Track materials issued to departments</p>
-//       </div>
-
-//       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex justify-between">
-//         <div className="relative w-full max-w-sm">
-//           <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-//           <input type="text" placeholder="Search by Ref No or Dept..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
-//         </div>
-//         <div className="flex gap-2">
-//            <button onClick={fetchData} className="p-2 border rounded-md hover:bg-gray-50"><RefreshCw size={18} className={loading ? "animate-spin" : ""} /></button>
-//            <button onClick={() => navigate('/inventorymanagement/mis/add')} className="bg-[#0f4a4a] text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm font-medium"><Plus size={18}/> Create MIS</button>
-//         </div>
-//       </div>
-
-//       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-//         <table className="w-full text-left border-collapse">
-//           <thead className="bg-[#0f4a4a] text-white text-sm">
-//             <tr>
-//               <th className="p-3">Ref No (MIS)</th>
-//               <th className="p-3">Date</th>
-//               <th className="p-3">RMP Ref</th>
-//               <th className="p-3">Department</th>
-//               <th className="p-3">Issued To</th>
-//               {/* Header change kiya hai taaki Actions clear rahe */}
-//               <th className="p-3 text-center">Actions</th>
-//             </tr>
-//           </thead>
-//           <tbody className="text-sm text-gray-700">
-//             {data.length === 0 && !loading && (
-//               <tr>
-//                 <td colSpan="6" className="text-center p-8 text-gray-500">No data found.</td>
-//               </tr>
-//             )}
-//             {data.map((item) => (
-//               <tr key={item._id} className="border-b hover:bg-gray-50">
-//                 <td className="p-3 font-semibold text-[#0f4a4a]">{item.ref_no}</td>
-//                 <td className="p-3">{new Date(item.issue_date).toLocaleDateString('en-GB')}</td>
-//                 <td className="p-3">{item.rmp_ref_no || '-'}</td>
-//                 <td className="p-3">{item.department}</td>
-//                 <td className="p-3">{item.issued_to}</td>
-                
-//                 {/* 👇 YAHAN EDIT AUR PRINT KE BUTTONS HAIN 👇 */}
-//                 <td className="p-3 text-center flex justify-center gap-2">
-//                   <button 
-//                     onClick={() => navigate(`/inventorymanagement/mis/add?id=${item._id}`)} 
-//                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
-//                     title="Edit Slip"
-//                   >
-//                     <Edit size={18} />
-//                   </button>
-
-//                   <button 
-//                     onClick={() => setPrintEntry(item)} 
-//                     className="p-2 text-gray-600 hover:bg-gray-200 rounded-md transition"
-//                     title="Print Slip"
-//                   >
-//                     <Printer size={18} />
-//                   </button>
-//                 </td>
-//               </tr>
-//             ))}
-//           </tbody>
-//         </table>
-//       </div>
-
-//       {/* PRINT SLIP MODAL */}
-//       {printEntry && (
-//         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-//           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl overflow-hidden my-8">
-            
-//             <div className="flex justify-between items-center bg-gray-100 p-4 border-b print:hidden">
-//               <h3 className="font-bold text-gray-800">Print Preview</h3>
-//               <div className="flex gap-2">
-//                 <button onClick={handlePrint} className="bg-[#0f4a4a] text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm"><Printer size={16}/> Print Slip</button>
-//                 <button onClick={() => setPrintEntry(null)} className="p-2 border rounded-md hover:bg-gray-200"><X size={18}/></button>
-//               </div>
-//             </div>
-
-//             <div className="p-10 print:p-0" id="print-area">
-//               <div className="border-2 border-gray-800 p-6">
-//                 <div className="text-center border-b-2 border-gray-800 pb-4 mb-4">
-//                   <h1 className="text-3xl font-bold uppercase tracking-widest">Suyash Enterprises</h1>
-//                   <p className="text-sm font-semibold mt-1">MATERIAL ISSUE SLIP</p>
-//                 </div>
-//                 <div className="flex justify-between text-sm mb-6">
-//                   <div>
-//                     <p><strong>Slip No:</strong> {printEntry.ref_no}</p>
-//                     <p><strong>Date:</strong> {new Date(printEntry.issue_date).toLocaleDateString('en-GB')}</p>
-//                     <p><strong>RMP Ref:</strong> {printEntry.rmp_ref_no || 'N/A'}</p>
-//                   </div>
-//                   <div className="text-right">
-//                     <p><strong>Department:</strong> {printEntry.department}</p>
-//                     <p><strong>Issued To:</strong> {printEntry.issued_to}</p>
-//                   </div>
-//                 </div>
-//                 <table className="w-full text-sm border-collapse border border-gray-800 mb-10">
-//                   <thead className="bg-gray-200">
-//                     <tr>
-//                       <th className="border border-gray-800 p-2">S.No</th>
-//                       <th className="border border-gray-800 p-2">Material Name</th>
-//                       <th className="border border-gray-800 p-2">Code</th>
-//                       <th className="border border-gray-800 p-2">Qty</th>
-//                       <th className="border border-gray-800 p-2">Unit</th>
-//                     </tr>
-//                   </thead>
-//                   <tbody>
-//                     {printEntry.items.map((item, idx) => (
-//                       <tr key={idx}>
-//                         <td className="border border-gray-800 p-2 text-center">{idx + 1}</td>
-//                         <td className="border border-gray-800 p-2">{item.name}</td>
-//                         <td className="border border-gray-800 p-2">{item.code}</td>
-//                         <td className="border border-gray-800 p-2 text-right">{item.quantity}</td>
-//                         <td className="border border-gray-800 p-2 text-center">{item.unit}</td>
-//                       </tr>
-//                     ))}
-//                   </tbody>
-//                 </table>
-//                 <div className="flex justify-between mt-16 pt-8">
-//                   <div className="text-center"><div className="border-t border-gray-800 w-40 pt-1 font-semibold text-sm">Issued By</div></div>
-//                   <div className="text-center"><div className="border-t border-gray-800 w-40 pt-1 font-semibold text-sm">Received By</div></div>
-//                   <div className="text-center"><div className="border-t border-gray-800 w-40 pt-1 font-semibold text-sm">Authorised By</div></div>
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//       )}
-
-//       <style>
-//         {`
-//           @media print {
-//             body * { visibility: hidden; }
-//             #print-area, #print-area * { visibility: visible; }
-//             #print-area { position: absolute; left: 0; top: 0; width: 100%; }
-//             .print\\:hidden { display: none !important; }
-//           }
-//         `}
-//       </style>
-
-//     </div>
-//   );
-// };
-
-// export default MISMaster;
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -196,8 +11,8 @@ import {
   Close as CloseIcon, Inventory2 as EmptyIcon
 } from '@mui/icons-material';
 import { Plus, Search, RefreshCw, Printer, X } from 'lucide-react';
+import BASE_URL from '../../../config/Config'; // 👈 Config madhun import kela
 
-// Same colors as RMP
 const COLORS = {
   primary: '#063C3F', primaryDark: '#05292B', primaryLight: '#E8F0F1',
   text: '#151C26', secondary: '#4B5568', tertiary: '#94A3B8',
@@ -225,7 +40,6 @@ const MISMaster = () => {
 
   const notify = (message, severity = 'success') => setSnack({ open: true, message, severity });
 
-  // Search Debounce
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput.trim()); setPage(0); }, 400);
     return () => clearTimeout(t);
@@ -235,7 +49,8 @@ const MISMaster = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://localhost:5009/api/material-issue-slip`, {
+      // 👇 BASE_URL lagaya
+      const res = await axios.get(`${BASE_URL}/api/material-issue-slip`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { page: page + 1, limit: rowsPerPage, search: search || undefined }
       });
@@ -360,7 +175,6 @@ const MISMaster = () => {
           </table>
         </div>
 
-        {/* MUI Pagination */}
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
@@ -378,7 +192,6 @@ const MISMaster = () => {
         />
       </div>
 
-      {/* Action Menu (3-Dots) */}
       <Menu
         anchorEl={menuAnchor}
         open={Boolean(menuAnchor)}
@@ -395,7 +208,6 @@ const MISMaster = () => {
         </MenuItem>
       </Menu>
 
-      {/* Print Modal (Same as before) */}
       {printEntry && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden my-8">
