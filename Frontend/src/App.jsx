@@ -249,7 +249,6 @@
 
 // export default App
 
-
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
@@ -325,6 +324,19 @@ import OeeMaster from './pages/bommaster/oeemaster/OeeMaster'
 import RoutingMaster from './pages/bommaster/routing/RoutingMaster'
 import MrpMaster from './pages/bommaster/MRP/MrpMaster'
 import WorkOrdersMaster from './pages/productionmaster/workordersmaster/WorkOrdersMaster'
+
+// 👇 PURCHASE RAW MATERIAL IMPORTS 👇
+import RMPurchaseMaster from './pages/inventory management/rmpurchase/RMPurchaseMaster'
+import AddRMPurchase from './pages/inventory management/rmpurchase/AddRMPurchase'
+
+// 👇 NAYE MATERIAL ISSUE SLIP IMPORTS (MIS) 👇
+import MISMaster from './pages/inventory management/materialissueslip/MISMaster'
+import AddMIS from './pages/inventory management/materialissueslip/AddMIS'
+
+// 👇 FINISHED GOODS IMPORTS 👇
+import FinishedGoodMaster from './pages/inventory management/finishedgood/FinishedGoodMaster'
+import AddFinishedGood from './pages/inventory management/finishedgood/AddFinishedGood'
+
 import WareHouseMaster from './pages/inventory management/warehousemaster/WareHouseMaster'
 import MIVMaster from './pages/inventory management/materialissues/MIVMaster'
 import MRVMaster from './pages/inventory management/materialreturnvoucher/MRVMaster'
@@ -356,8 +368,6 @@ import Gstr3bData from './pages/reportsmaster/gstcompilance/Gstr3bData'
 import MonthlyRevenueReport from './pages/reportsmaster/monthlyrevenuemaster/MonthlyRevenueReport'
 import SubcontractList from './pages/productionmaster/subcontract/SubcontractList'
 
-// ✅ NEW IMPORT ADDED HERE
-import PurchaseRawMaterial from './pages/inventory management/PurchaseRawMaterial'
 
 
 const PrivateRoute = ({ children }) => {
@@ -462,8 +472,17 @@ const App = () => {
           <Route path='inventorymanagement/mrvmaster' element={<MRVMaster />} />
           <Route path='inventorymanagement/psvmaster' element={<PSVMaster />} />
 
-          {/* ✅ NEW ROUTE ADDED HERE */}
-          <Route path='inventorymanagement/purchaserawmaterial' element={<PurchaseRawMaterial />} />
+          {/* 👇 PURCHASE RAW MATERIAL ROUTES 👇 */}
+          <Route path='inventorymanagement/rmpurchase' element={<RMPurchaseMaster />} />
+          <Route path='inventorymanagement/rmpurchase/add' element={<AddRMPurchase />} />
+
+          {/* 👇 NAYE MATERIAL ISSUE SLIP ROUTES (MIS) 👇 */}
+          <Route path='inventorymanagement/mis' element={<MISMaster />} />
+          <Route path='inventorymanagement/mis/add' element={<AddMIS />} />
+
+          {/* 👇 FINISHED GOODS ROUTES 👇 */}
+          <Route path='inventorymanagement/finishedgood' element={<FinishedGoodMaster />} />
+          <Route path='inventorymanagement/finishedgood/add' element={<AddFinishedGood />} />
 
           <Route path='productionmaster/workordersmaster' element={<WorkOrdersMaster/>} />
            <Route path='productionmaster/assemblylines' element={<AssemblyLineMaster/>} />

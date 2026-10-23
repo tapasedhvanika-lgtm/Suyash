@@ -1,4 +1,3 @@
-
 // const express = require('express');
 // const mongoose = require('mongoose');
 // const path = require('path');
@@ -523,7 +522,7 @@
 //   server.close(() => process.exit(1));
 // });
 
-// module.exports = server;  
+// module.exports = server;
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -625,8 +624,10 @@ const materialReturnRoutes = require('./routes/Inventory/materialReturnRoutes');
 const physicalVerificationRoutes = require('./routes/Inventory/psvRoutes');
 const stockRoutes = require('./routes/Inventory/stockRoutes');
 
-// ✅ NEW INVENTORY ROUTE IMPORT
-const purchaseRoutes = require('./routes/Inventory/purchaseRoutes'); 
+// 👇 NAYI LINES YAHAN ADD KI HAI 👇
+const rmPurchaseRoutes = require('./routes/Inventory/rmPurchaseRoutes');
+const materialIssueSlipRoutes = require('./routes/Inventory/materialIssueSlipRoutes');
+const finishedGoodRoutes = require('./routes/Inventory/finishedGoodRoutes'); // 👈 Finished Good Import
 
 const mrpRoutes = require('./routes/Production/mrpRoutes');
 const workOrderRoutes = require('./routes/Production/workOrderRoutes');
@@ -759,11 +760,14 @@ app.use('/api/process-master', processMasterRoutes);
 app.use('/api/warehouses', warehouseRoutes);
 app.use('/api/miv', materialIssueRoutes);
 app.use('/api/mrv', materialReturnRoutes);
+
+// 👇 NAYI LINES YAHAN ADD KI HAI 👇
+app.use('/api/rm-purchase', rmPurchaseRoutes);
+app.use('/api/material-issue-slip', materialIssueSlipRoutes);
+app.use('/api/finished-good', finishedGoodRoutes); // 👈 Finished Good Mount
+
 app.use('/api/physical-verifications', physicalVerificationRoutes);
 app.use('/api', stockRoutes);
-
-// ✅ NEW INVENTORY ROUTE MOUNT
-app.use('/api/inventory/purchase', purchaseRoutes);
 
 // Production Routes
 app.use('/api/mrp', mrpRoutes);
