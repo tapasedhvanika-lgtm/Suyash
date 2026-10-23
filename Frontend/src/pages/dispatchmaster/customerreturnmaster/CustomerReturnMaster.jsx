@@ -2607,7 +2607,73 @@ const CustomerReturnMaster = () => {
         />
       )}
 
-      {/* View Modal - You can create a separate ViewCustomerReturn component if needed */}
+      {/* View Customer Return Dialog */}
+<Dialog
+  open={openViewModal}
+  onClose={() => {
+    setOpenViewModal(false);
+    setSelectedReturn(null);
+  }}
+  maxWidth="md"
+  fullWidth
+>
+  <DialogTitle>Customer Return Details</DialogTitle>
+
+  <DialogContent dividers>
+    {selectedReturn ? (
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+        <Typography>
+          <strong>Return ID:</strong> {selectedReturn.return_id || '-'}
+        </Typography>
+
+        <Typography>
+          <strong>Return Date:</strong>{' '}
+          {selectedReturn.return_date
+            ? formatDate(selectedReturn.return_date)
+            : '-'}
+        </Typography>
+
+        <Typography>
+          <strong>Customer:</strong>{' '}
+          {selectedReturn.customer_name ||
+            selectedReturn.customer?.customer_name ||
+            selectedReturn.customer?.name ||
+            '-'}
+        </Typography>
+
+        <Typography>
+          <strong>Return Type:</strong> {selectedReturn.return_type || '-'}
+        </Typography>
+
+        <Typography>
+          <strong>Return Reason:</strong> {selectedReturn.return_reason || '-'}
+        </Typography>
+
+        <Typography>
+          <strong>Status:</strong> {selectedReturn.status || '-'}
+        </Typography>
+
+        <Typography>
+          <strong>Total Value:</strong>{' '}
+          ₹{(selectedReturn.total_return_value || 0).toLocaleString('en-IN')}
+        </Typography>
+      </Box>
+    ) : (
+      <Typography>No return selected.</Typography>
+    )}
+  </DialogContent>
+
+  <DialogActions>
+    <Button
+      onClick={() => {
+        setOpenViewModal(false);
+        setSelectedReturn(null);
+      }}
+    >
+      Close
+    </Button>
+  </DialogActions>
+</Dialog>
       
       <Snackbar
         open={snackbar.open}
