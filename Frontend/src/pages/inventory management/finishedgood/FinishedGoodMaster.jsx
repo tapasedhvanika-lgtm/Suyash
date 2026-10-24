@@ -50,7 +50,7 @@ const FinishedGoodMaster = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      // 👇 BASE_URL lagaya
+      
       const res = await axios.get(`${BASE_URL}/api/finished-good`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { page: page + 1, limit: rowsPerPage, search: search || undefined }
