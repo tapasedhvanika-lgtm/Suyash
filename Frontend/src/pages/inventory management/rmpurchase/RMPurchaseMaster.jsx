@@ -1,5 +1,4 @@
-// // pages/inventory management/rmpurchase/RMPurchaseMaster.jsx
-// // Purchase Raw Material - list page (Warehouse Master jaisa look)
+
 // import React, { useState, useEffect, useCallback } from 'react';
 // import { useNavigate, useLocation } from 'react-router-dom';
 // import axios from 'axios';
@@ -499,6 +498,7 @@ const RMPurchaseMaster = () => {
                 <th className={th}>RM Type</th>
                 <th className={th}>Name / Code</th>
                 <th className={th}>Quantity</th>
+                <th className={th}>Remaining Qty</th>
                 <th className={th}>Party Name</th>
                 <th className={th}>Invoice No</th>
                 <th className={`${th} text-center w-[60px]`}>Actions</th>
@@ -507,14 +507,14 @@ const RMPurchaseMaster = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center">
+                  <td colSpan={9} className="py-12 text-center">
                     <CircularProgress size={32} sx={{ color: COLORS.primary }} />
                     <div className="text-[0.75rem] mt-2">Loading purchases...</div>
                   </td>
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center">
+                  <td colSpan={9} className="py-12 text-center">
                     <EmptyIcon sx={{ fontSize: 48, color: COLORS.tertiary }} />
                     <div className="text-[0.875rem] text-[#4B5568]">
                       {search ? 'No purchases found' : 'No purchases available'}
@@ -548,6 +548,12 @@ const RMPurchaseMaster = () => {
                         </div>
                       </td>
                       <td className={`${td} font-medium`}>{item.quantity} <span className="text-[#94A3B8]">{item.unit}</span></td>
+                      <td className={`${td} font-semibold`}>
+                        <span className={(item.remaining_qty ?? item.quantity) > 0 ? 'text-[#059669]' : 'text-[#EF4444]'}>
+                          {item.remaining_qty ?? item.quantity}
+                        </span>{' '}
+                        <span className="text-[#94A3B8] font-normal">{item.unit}</span>
+                      </td>
                       <td className={td}>{item.party_name}</td>
                       <td className={td}>{item.invoice_no}</td>
                       <td className={`${td} text-center`}>
@@ -619,6 +625,8 @@ const RMPurchaseMaster = () => {
             ['Material Name', viewEntry.name],
             ['Material Code', viewEntry.code],
             ['Quantity', `${viewEntry.quantity} ${viewEntry.unit}`],
+            ['Issued Qty', `${viewEntry.issued_qty ?? 0} ${viewEntry.unit}`],
+            ['Remaining Qty', `${viewEntry.remaining_qty ?? viewEntry.quantity} ${viewEntry.unit}`],
             ['Party Name', viewEntry.party_name],
             ['Invoice No', viewEntry.invoice_no]
           ].map(([label, value]) => (

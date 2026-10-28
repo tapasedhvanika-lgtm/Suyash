@@ -1,3 +1,6 @@
+
+
+// export default MISMaster;
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -11,7 +14,7 @@ import {
   Close as CloseIcon, Inventory2 as EmptyIcon
 } from '@mui/icons-material';
 import { Plus, Search, RefreshCw, Printer, X } from 'lucide-react';
-import BASE_URL from '../../../config/Config'; // 👈 Config madhun import kela
+import BASE_URL from '../../../config/Config';
 
 const COLORS = {
   primary: '#063C3F', primaryDark: '#05292B', primaryLight: '#E8F0F1',
@@ -49,7 +52,6 @@ const MISMaster = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      // 👇 BASE_URL lagaya
       const res = await axios.get(`${BASE_URL}/api/material-issue-slip`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { page: page + 1, limit: rowsPerPage, search: search || undefined }
@@ -157,7 +159,8 @@ const MISMaster = () => {
                   <tr key={item._id} className="border-b border-[#E3E8EF] hover:bg-[#F0FDF9]">
                     <td className={`${td} font-semibold text-[#063C3F]`}>{item.ref_no}</td>
                     <td className={td}>{new Date(item.issue_date).toLocaleDateString('en-GB')}</td>
-                    <td className={td}>{item.rmp_ref_no || '-'}</td>
+                    {}
+                    <td className={td}>{item.purchase_ref || item.rmp_ref_no || '-'}</td>
                     <td className={td}>{item.department}</td>
                     <td className={td}>{item.issued_to}</td>
                     <td className={`${td} text-center`}>
@@ -228,7 +231,8 @@ const MISMaster = () => {
                   <div className="space-y-1">
                     <p><span className="text-gray-500 inline-block w-20">Slip No:</span> <strong>{printEntry.ref_no}</strong></p>
                     <p><span className="text-gray-500 inline-block w-20">Date:</span> {new Date(printEntry.issue_date).toLocaleDateString('en-GB')}</p>
-                    <p><span className="text-gray-500 inline-block w-20">RMP Ref:</span> {printEntry.rmp_ref_no || 'N/A'}</p>
+                    {/* FIX 2: Print me RMP Ref fix kiya hai */}
+                    <p><span className="text-gray-500 inline-block w-20">RMP Ref:</span> {printEntry.purchase_ref || printEntry.rmp_ref_no || 'N/A'}</p>
                   </div>
                   <div className="text-right space-y-1">
                     <p><span className="text-gray-500">Department:</span> <strong>{printEntry.department}</strong></p>
@@ -246,15 +250,14 @@ const MISMaster = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {printEntry.items.map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="border border-gray-800 p-2 text-center">{idx + 1}</td>
-                        <td className="border border-gray-800 p-2 font-medium">{item.name}</td>
-                        <td className="border border-gray-800 p-2">{item.code}</td>
-                        <td className="border border-gray-800 p-2 text-right">{item.quantity}</td>
-                        <td className="border border-gray-800 p-2 text-center">{item.unit}</td>
-                      </tr>
-                    ))}
+                    {/* FIX 3: Print me items array ki jagah direct data dikhaya hai */}
+                    <tr>
+                      <td className="border border-gray-800 p-2 text-center">1</td>
+                      <td className="border border-gray-800 p-2 font-medium">{printEntry.name}</td>
+                      <td className="border border-gray-800 p-2">{printEntry.code}</td>
+                      <td className="border border-gray-800 p-2 text-right">{printEntry.quantity}</td>
+                      <td className="border border-gray-800 p-2 text-center">{printEntry.unit}</td>
+                    </tr>
                   </tbody>
                 </table>
                 <div className="flex justify-between mt-20 pt-8">
@@ -291,3 +294,4 @@ const MISMaster = () => {
 };
 
 export default MISMaster;
+
