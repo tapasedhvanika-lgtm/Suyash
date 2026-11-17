@@ -277,6 +277,9 @@ import LeaveTypeMaster from './pages/hrmaster/leavetypemaster/LeaveTypeMaster'
 import RawMaterialMaster from './pages/master/rawmaterialmaster/RawMaterialMaster'
 import VendorMaster from './pages/master/vendormaster/VendorMaster'
 
+// 👇 ATTENDANCE MASTER IMPORT 👇
+import AttendanceMaster from './pages/hrmaster/attendancemaster/AttendanceMaster';
+
 import ApplyLeave from './pages/hrmaster/employeeleavemaster/EmployeeLeaveMaster'
 import MyLeaves from './pages/hrmaster/employeeleavemaster/MyLeaves'
 import LeaveApproval from './pages/hrmaster/employeeleavemaster/LeaveApproval'
@@ -315,7 +318,6 @@ import OrderBook from './pages/salesordermaster/sodelivery/OrderBook'
 import SORevise from './pages/salesordermaster/sorevision/SORevise'
 import SOSummary from './pages/salesordermaster/soreports/SOSummary'
 import SOPendingDelivery from './pages/salesordermaster/soreports/SOPendingDelivery'
-
 
 import VendorPayments from './pages/procurementmaster/vendorpayments/VendorPayments'
 import BomMaster from './pages/bommaster/BOM/BomMaster'
@@ -444,6 +446,8 @@ const App = () => {
           <Route path='hrmaster/adminleavemaster' element={<AdminLeaveApproval/>} />
           <Route path='hrmaster/trainingrecordmaster' element={<TrainingRecordMaster/>} />
 
+          {/* 👇 ATTENDANCE MASTER ROUTE 👇 */}
+          <Route path="/hrmaster/attendancemaster" element={<AttendanceMaster />} /> 
 
           <Route path='procurementmaster/grnmaster' element={<GRNMaster/>} />
           <Route path='procurementmaster/purchaseordermaster' element={<PurchaseOrderMaster/>} />
@@ -451,7 +455,6 @@ const App = () => {
           <Route path='procurementmaster/rfqmaster' element={<RFQMaster/>} />
           <Route path='procurementmaster/purchaseinvoicemaster' element={<PurchaseInvoiceMaster/>} />
           <Route path='procurementmaster/vendor-payments' element={<VendorPayments/>} />
-
 
           <Route path='bommaster/bommaster' element={<BomMaster/>} />
           <Route path='machinemaster/machinemaster' element={<MachineMaster/>} />
@@ -464,7 +467,6 @@ const App = () => {
           <Route path='salesordermaster/sorevision' element={<SORevise/>} />
           <Route path='salesordermaster/sosummary' element={<SOSummary/>} />
           <Route path='salesordermaster/sopendingdelivery' element={<SOPendingDelivery/>} />
-
 
           <Route path='inventorymanagement/warehousemaster' element={<WareHouseMaster />} />
           <Route path="inventorymanagement/stockledger" element={<StockLedgerMaster />} />
@@ -495,7 +497,6 @@ const App = () => {
           <Route path="dispatchmaster/delivery-schedule" element={<DeliveryScheduleMaster />} />
           <Route path="dispatchmaster/customer-returns" element={<CustomerReturnMaster />} />
           
-
           <Route path="inspectionmaster/gaugemaster" element={<GaugeMaster />} />
           <Route path="inspectionmaster/inspectionplan" element={<InspectionPlanMaster />} />
           <Route path="inspectionmaster/inspectionrecord" element={<InspectionRecordMaster />} />

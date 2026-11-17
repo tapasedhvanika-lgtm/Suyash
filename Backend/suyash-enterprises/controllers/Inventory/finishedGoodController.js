@@ -1,7 +1,3 @@
-
-
-
-
 const FinishedGood = require('../../models/Inventory/FinishedGood');
 const Item = require('../../models/CRM/Item');
 const nextRef = require('../../utils/nextRef');
