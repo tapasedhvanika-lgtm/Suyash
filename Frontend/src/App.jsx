@@ -289,6 +289,9 @@ import LeaveTypeMaster from './pages/hrmaster/leavetypemaster/LeaveTypeMaster'
 import RawMaterialMaster from './pages/master/rawmaterialmaster/RawMaterialMaster'
 import VendorMaster from './pages/master/vendormaster/VendorMaster'
 
+// 👇 ATTENDANCE MASTER IMPORT 👇
+import AttendanceMaster from './pages/hrmaster/attendancemaster/AttendanceMaster';
+
 import ApplyLeave from './pages/hrmaster/employeeleavemaster/EmployeeLeaveMaster'
 import MyLeaves from './pages/hrmaster/employeeleavemaster/MyLeaves'
 import LeaveApproval from './pages/hrmaster/employeeleavemaster/LeaveApproval'
@@ -442,6 +445,7 @@ const App = () => {
           <Route path='hrmaster/employeeleavemaster' element={<EmployeeLeaveMaster/>} />
           <Route path='hrmaster/adminleavemaster' element={<AdminLeaveApproval/>} />
           <Route path='hrmaster/trainingrecordmaster' element={<TrainingRecordMaster/>} />
+          <Route path='hrmaster/attendancemaster' element={<AttendanceMaster/>} />
 
           <Route path='procurementmaster/grnmaster' element={<GRNMaster/>} />
           <Route path='procurementmaster/purchaseordermaster' element={<PurchaseOrderMaster/>} />
