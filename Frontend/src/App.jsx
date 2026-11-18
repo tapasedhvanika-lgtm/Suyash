@@ -1,13 +1,14 @@
+
+
 // import React from 'react'
 // import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 // import Layout from './components/Layout'
 // import Dashboard from './pages/Dashboard'
 // import Users from './pages/users/Users'
 // import Quotation from './pages/quotation/Quotation'
-// // import CustomerMaster from './pages/master/customermaster/CustomerMaster'
 // import ItemMaster from './pages/master/itemmaster/ItemMaster'
-// import MaterialMaster from './pages/master/materialmaster/MaterialMaster'  // Fixed: lowercase 'master'
-// import CompanyMaster from './pages/master/companymaster/CompanyMaster'    // Fixed: lowercase 'master'
+// import MaterialMaster from './pages/master/materialmaster/MaterialMaster'
+// import CompanyMaster from './pages/master/companymaster/CompanyMaster'
 // import CostingMaster from './pages/master/costingmaster/CostingMaster'
 // import DimentionMaster from './pages/master/dimentionmaster/DimentionMaster'
 // import OperationMaster from './pages/master/operationmaster/OperationMaster'
@@ -32,7 +33,6 @@
 // import EmployeeLeaveMaster from './pages/hrmaster/employeeleavemaster/EmployeeLeaveMaster'
 // import AdminLeaveApproval from './pages/hrmaster/adminleavemaster/AdminLeaveApproval'
 // import ShiftMaster from './pages/hrmaster/shiftmaster/ShiftMaster'
-// //import MedicalRecordMaster from './pages/hrmaster/medicalrecordmaster/MedicalRecordMaster'
 // import AccidentMaster from './pages/hrmaster/accidentmaster/AccidentMaster'
 // import RequisitionMaster from './pages/hrmaster/requisitionmaster/RequisitionMaster'
 // import JobOpeningMaster from './pages/hrmaster/jobopeningmaster/JobOpeningMaster'
@@ -43,7 +43,10 @@
 // import RegularizationMaster from './pages/hrmaster/regularizationmaster/RegularizationMaster'
 // import ProductionMaster from './pages/hrmaster/productionmaster/ProductionMaster'
 // import TerminationMaster from './pages/hrmaster/terminationmaster/TerminationMaster'
-// import EmployeeBehaviorMaster from './pages/hrmaster/employeebehaviormaster/EmployeeBehaviorMaster'
+
+// // 🔴 Yahan spelling theek kar di gayi hai (behvior -> behavior)
+// import EmployeeBehaviorMaster from './pages/hrmaster/employeebehaviormaster/EmployeeBehaviorMaster' 
+
 // import SelectedCandidatesMaster from './pages/hrmaster/selectedcandidatemsater/SelectedCandidatesMaster'
 // import ProcessDetailsMaster from './pages/master/processdetailsmaster/ProcessDetailsMaster'
 // import CompanyFinancialMaster from './pages/master/companyfinancialmaster/CompanyFinancialMaster'
@@ -65,7 +68,6 @@
 // import SOSummary from './pages/salesordermaster/soreports/SOSummary'
 // import SOPendingDelivery from './pages/salesordermaster/soreports/SOPendingDelivery'
 
-
 // import VendorPayments from './pages/procurementmaster/vendorpayments/VendorPayments'
 // import BomMaster from './pages/bommaster/BOM/BomMaster'
 // import MachineMaster from './pages/bommaster/machinemaster/MachineMaster'
@@ -73,6 +75,18 @@
 // import RoutingMaster from './pages/bommaster/routing/RoutingMaster'
 // import MrpMaster from './pages/bommaster/MRP/MrpMaster'
 // import WorkOrdersMaster from './pages/productionmaster/workordersmaster/WorkOrdersMaster'
+
+// // 👇 PURCHASE RAW MATERIAL IMPORTS (AddRMPurchase removed) 👇
+// import RMPurchaseMaster from './pages/inventory management/rmpurchase/RMPurchaseMaster'
+
+// // 👇 NAYE MATERIAL ISSUE SLIP IMPORTS (MIS) 👇
+// import MISMaster from './pages/inventory management/materialissueslip/MISMaster'
+// import AddMIS from './pages/inventory management/materialissueslip/AddMIS'
+
+// // 👇 FINISHED GOODS IMPORTS 👇
+// import FinishedGoodMaster from './pages/inventory management/finishedgood/FinishedGoodMaster'
+// import AddFinishedGood from './pages/inventory management/finishedgood/AddFinishedGood'
+
 // import WareHouseMaster from './pages/inventory management/warehousemaster/WareHouseMaster'
 // import MIVMaster from './pages/inventory management/materialissues/MIVMaster'
 // import MRVMaster from './pages/inventory management/materialreturnvoucher/MRVMaster'
@@ -104,22 +118,17 @@
 // import MonthlyRevenueReport from './pages/reportsmaster/monthlyrevenuemaster/MonthlyRevenueReport'
 // import SubcontractList from './pages/productionmaster/subcontract/SubcontractList'
 
-
-
 // const PrivateRoute = ({ children }) => {
 //   const isLoggedIn = localStorage.getItem('isLoggedIn')
-
 //   if (!isLoggedIn || isLoggedIn !== 'true') {
 //     return <Navigate to="/login" replace />
 //   }
-
 //   return children
 // }
 
 // const App = () => {
 //   return (
 //     <BrowserRouter>
-//          {/* <BrowserRouter basename="/suyashtest-front">  */}
 //       <Routes>
 //         {/* Public Routes */}
 //         <Route path="/login" element={<Login />} />
@@ -134,18 +143,16 @@
 //           <Route index element={<Navigate to="/dashboard" replace />} />
 //           <Route path="dashboard" element={<Dashboard />} />
 //           <Route path="users" element={<Users />} />
-//            <Route path="users/adduser" element={<AddUser />} />
+//           <Route path="users/adduser" element={<AddUser />} />
 //           <Route path="quotation" element={<Quotation />} />
-//           {/* <Route path="master/customermaster" element={<CustomerMaster />} /> */}
 //           <Route path="master/vendormaster" element={<VendorMaster />} />
 //           <Route path="master/itemmaster" element={<ItemMaster />} />
 //           <Route path="master/companymaster" element={<CompanyMaster />} />
 //           <Route path="master/costingmaster" element={<CostingMaster />} />
 //           <Route path="master/dimentionmaster" element={<DimentionMaster />} />
-//           {/* <Route path="master/operationmaster" element={<OperationMaster />} /> */}
 //           <Route path="master/processmaster" element={<ProcessMaster />} />
-//            <Route path="master/customermaster" element={<CustomerMaster />} />
-//            <Route path="master/leadsmaster" element={<LeadsMaster />} />
+//           <Route path="master/customermaster" element={<CustomerMaster />} />
+//           <Route path="master/leadsmaster" element={<LeadsMaster />} />
 //           <Route path="master/quotationmaster" element={<QuotationMaster />} />
 //           <Route path="master/taxmaster" element={<TaxMaster />} />
 //           <Route path="master/termsandconditionmaster" element={<TermsAndConditionMaster />} />
@@ -158,21 +165,20 @@
 //           <Route path="hrmaster/employeemaster" element={<EmployeeMaster />} />
 //           <Route path="hrmaster/contractmaster" element={<ContractMaster />} />
 //           <Route path="hrmaster/leavetypemaster" element={<LeaveTypeMaster />} />
-//            <Route path="hrmaster/shiftmaster" element={<ShiftMaster />} />
-//             {/* <Route path="hrmaster/medicalmaster" element={<MedicalRecordMaster />} /> */}
-//              <Route path="hrmaster/accidentmaster" element={<AccidentMaster />} />
-//               <Route path="hrmaster/requisitionmaster" element={<RequisitionMaster />} />
-//               <Route path="hrmaster/jobopeningmaster" element={<JobOpeningMaster />} />
-//               <Route path="hrmaster/candidatemaster" element={<CandidateMaster />} />
-//               <Route path="hrmaster/selectedcandidatesmaster" element={<SelectedCandidatesMaster />} />
-//                <Route path="hrmaster/salarymaster" element={<SalaryMaster />} />
-//                  <Route path="hrmaster/pieceratemaster" element={<PieceRateMaster />} />
-//                   <Route path="hrmaster/regularizationmaster" element={<RegularizationMaster />} />
-//                   <Route path="hrmaster/productionmaster" element={<ProductionMaster />} />
-//                   <Route path="hrmaster/terminationmaster" element={<TerminationMaster />} />
-//                   <Route path="hrmaster/employeebehaviormaster" element={<EmployeeBehaviorMaster />} />
-//                <Route path="hrmaster/interviewmaster" element={<InterviewMaster />} />
-//                <Route path="hrmaster/mediclaimmaster" element={<MediclaimMaster />} />
+//           <Route path="hrmaster/shiftmaster" element={<ShiftMaster />} />
+//           <Route path="hrmaster/accidentmaster" element={<AccidentMaster />} />
+//           <Route path="hrmaster/requisitionmaster" element={<RequisitionMaster />} />
+//           <Route path="hrmaster/jobopeningmaster" element={<JobOpeningMaster />} />
+//           <Route path="hrmaster/candidatemaster" element={<CandidateMaster />} />
+//           <Route path="hrmaster/selectedcandidatesmaster" element={<SelectedCandidatesMaster />} />
+//           <Route path="hrmaster/salarymaster" element={<SalaryMaster />} />
+//           <Route path="hrmaster/pieceratemaster" element={<PieceRateMaster />} />
+//           <Route path="hrmaster/regularizationmaster" element={<RegularizationMaster />} />
+//           <Route path="hrmaster/productionmaster" element={<ProductionMaster />} />
+//           <Route path="hrmaster/terminationmaster" element={<TerminationMaster />} />
+//           <Route path="hrmaster/employeebehaviormaster" element={<EmployeeBehaviorMaster />} />
+//           <Route path="hrmaster/interviewmaster" element={<InterviewMaster />} />
+//           <Route path="hrmaster/mediclaimmaster" element={<MediclaimMaster />} />
 //           <Route path="roles" element={<Roles />} />
 //           <Route path="/roles/add" element={<AddRoles />} />
 
@@ -180,14 +186,12 @@
 //           <Route path='hrmaster/adminleavemaster' element={<AdminLeaveApproval/>} />
 //           <Route path='hrmaster/trainingrecordmaster' element={<TrainingRecordMaster/>} />
 
-
 //           <Route path='procurementmaster/grnmaster' element={<GRNMaster/>} />
 //           <Route path='procurementmaster/purchaseordermaster' element={<PurchaseOrderMaster/>} />
 //           <Route path='procurementmaster/purchaserequisitionmaster' element={<PurchaseRequisitionMaster/>} />
 //           <Route path='procurementmaster/rfqmaster' element={<RFQMaster/>} />
 //           <Route path='procurementmaster/purchaseinvoicemaster' element={<PurchaseInvoiceMaster/>} />
 //           <Route path='procurementmaster/vendor-payments' element={<VendorPayments/>} />
-
 
 //           <Route path='bommaster/bommaster' element={<BomMaster/>} />
 //           <Route path='machinemaster/machinemaster' element={<MachineMaster/>} />
@@ -201,16 +205,24 @@
 //           <Route path='salesordermaster/sosummary' element={<SOSummary/>} />
 //           <Route path='salesordermaster/sopendingdelivery' element={<SOPendingDelivery/>} />
 
-
 //           <Route path='inventorymanagement/warehousemaster' element={<WareHouseMaster />} />
 //           <Route path="inventorymanagement/stockledger" element={<StockLedgerMaster />} />
 //           <Route path='inventorymanagement/mivmaster' element={<MIVMaster />} />
 //           <Route path='inventorymanagement/mrvmaster' element={<MRVMaster />} />
 //           <Route path='inventorymanagement/psvmaster' element={<PSVMaster />} />
 
+//           {/* 👇 PURCHASE RAW MATERIAL ROUTE (Only Master) 👇 */}
+//           <Route path='inventorymanagement/rmpurchase' element={<RMPurchaseMaster />} />
+
+//           <Route path='inventorymanagement/mis' element={<MISMaster />} />
+//          // <Route path='inventorymanagement/mis/add' element={<AddMIS />} />
+
+//           <Route path='inventorymanagement/finishedgood' element={<FinishedGoodMaster />} />
+//           <Route path='inventorymanagement/finishedgood/add' element={<AddFinishedGood />} />
+
 //           <Route path='productionmaster/workordersmaster' element={<WorkOrdersMaster/>} />
-//            <Route path='productionmaster/assemblylines' element={<AssemblyLineMaster/>} />
-//              <Route path='productionmaster/productionschedule' element={<ProductionScheduleMaster/>} />
+//           <Route path='productionmaster/assemblylines' element={<AssemblyLineMaster/>} />
+//           <Route path='productionmaster/productionschedule' element={<ProductionScheduleMaster/>} />
 //           <Route path='productionmaster/productionconflict' element={<ProductionConflict/>} />
 //           <Route path='productionmaster/toolmaster' element={<ToolMaster/>} />
 //           <Route path='productionmaster/subcontractlist' element={<SubcontractList/>} />
@@ -219,7 +231,6 @@
 //           <Route path="dispatchmaster/delivery-schedule" element={<DeliveryScheduleMaster />} />
 //           <Route path="dispatchmaster/customer-returns" element={<CustomerReturnMaster />} />
           
-
 //           <Route path="inspectionmaster/gaugemaster" element={<GaugeMaster />} />
 //           <Route path="inspectionmaster/inspectionplan" element={<InspectionPlanMaster />} />
 //           <Route path="inspectionmaster/inspectionrecord" element={<InspectionRecordMaster />} />
@@ -240,7 +251,6 @@
 //           <Route path='reportsmaster/monthlyrevenuereport' element={<MonthlyRevenueReport />} />
 //         </Route>
 
-//         {/* Catch all route - redirect to home */}
 //         <Route path="*" element={<Navigate to="/" replace />} />
 //       </Routes>
 //     </BrowserRouter>
@@ -249,16 +259,18 @@
 
 // export default App
 
+
+
+
 import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Users from './pages/users/Users'
 import Quotation from './pages/quotation/Quotation'
-// import CustomerMaster from './pages/master/customermaster/CustomerMaster'
 import ItemMaster from './pages/master/itemmaster/ItemMaster'
-import MaterialMaster from './pages/master/materialmaster/MaterialMaster'  // Fixed: lowercase 'master'
-import CompanyMaster from './pages/master/companymaster/CompanyMaster'    // Fixed: lowercase 'master'
+import MaterialMaster from './pages/master/materialmaster/MaterialMaster'
+import CompanyMaster from './pages/master/companymaster/CompanyMaster'
 import CostingMaster from './pages/master/costingmaster/CostingMaster'
 import DimentionMaster from './pages/master/dimentionmaster/DimentionMaster'
 import OperationMaster from './pages/master/operationmaster/OperationMaster'
@@ -283,7 +295,6 @@ import LeaveApproval from './pages/hrmaster/employeeleavemaster/LeaveApproval'
 import EmployeeLeaveMaster from './pages/hrmaster/employeeleavemaster/EmployeeLeaveMaster'
 import AdminLeaveApproval from './pages/hrmaster/adminleavemaster/AdminLeaveApproval'
 import ShiftMaster from './pages/hrmaster/shiftmaster/ShiftMaster'
-//import MedicalRecordMaster from './pages/hrmaster/medicalrecordmaster/MedicalRecordMaster'
 import AccidentMaster from './pages/hrmaster/accidentmaster/AccidentMaster'
 import RequisitionMaster from './pages/hrmaster/requisitionmaster/RequisitionMaster'
 import JobOpeningMaster from './pages/hrmaster/jobopeningmaster/JobOpeningMaster'
@@ -294,7 +305,7 @@ import PieceRateMaster from './pages/hrmaster/pieceratemaster/PieceRateMaster'
 import RegularizationMaster from './pages/hrmaster/regularizationmaster/RegularizationMaster'
 import ProductionMaster from './pages/hrmaster/productionmaster/ProductionMaster'
 import TerminationMaster from './pages/hrmaster/terminationmaster/TerminationMaster'
-import EmployeeBehaviorMaster from './pages/hrmaster/employeebehaviormaster/EmployeeBehaviorMaster'
+import EmployeeBehaviorMaster from './pages/hrmaster/employeebehaviormaster/EmployeeBehaviorMaster' 
 import SelectedCandidatesMaster from './pages/hrmaster/selectedcandidatemsater/SelectedCandidatesMaster'
 import ProcessDetailsMaster from './pages/master/processdetailsmaster/ProcessDetailsMaster'
 import CompanyFinancialMaster from './pages/master/companyfinancialmaster/CompanyFinancialMaster'
@@ -316,7 +327,6 @@ import SORevise from './pages/salesordermaster/sorevision/SORevise'
 import SOSummary from './pages/salesordermaster/soreports/SOSummary'
 import SOPendingDelivery from './pages/salesordermaster/soreports/SOPendingDelivery'
 
-
 import VendorPayments from './pages/procurementmaster/vendorpayments/VendorPayments'
 import BomMaster from './pages/bommaster/BOM/BomMaster'
 import MachineMaster from './pages/bommaster/machinemaster/MachineMaster'
@@ -327,15 +337,12 @@ import WorkOrdersMaster from './pages/productionmaster/workordersmaster/WorkOrde
 
 // 👇 PURCHASE RAW MATERIAL IMPORTS 👇
 import RMPurchaseMaster from './pages/inventory management/rmpurchase/RMPurchaseMaster'
-import AddRMPurchase from './pages/inventory management/rmpurchase/AddRMPurchase'
 
 // 👇 NAYE MATERIAL ISSUE SLIP IMPORTS (MIS) 👇
 import MISMaster from './pages/inventory management/materialissueslip/MISMaster'
-import AddMIS from './pages/inventory management/materialissueslip/AddMIS'
 
 // 👇 FINISHED GOODS IMPORTS 👇
 import FinishedGoodMaster from './pages/inventory management/finishedgood/FinishedGoodMaster'
-import AddFinishedGood from './pages/inventory management/finishedgood/AddFinishedGood'
 
 import WareHouseMaster from './pages/inventory management/warehousemaster/WareHouseMaster'
 import MIVMaster from './pages/inventory management/materialissues/MIVMaster'
@@ -368,22 +375,17 @@ import Gstr3bData from './pages/reportsmaster/gstcompilance/Gstr3bData'
 import MonthlyRevenueReport from './pages/reportsmaster/monthlyrevenuemaster/MonthlyRevenueReport'
 import SubcontractList from './pages/productionmaster/subcontract/SubcontractList'
 
-
-
 const PrivateRoute = ({ children }) => {
   const isLoggedIn = localStorage.getItem('isLoggedIn')
-
   if (!isLoggedIn || isLoggedIn !== 'true') {
     return <Navigate to="/login" replace />
   }
-
   return children
 }
 
 const App = () => {
   return (
     <BrowserRouter>
-         {/* <BrowserRouter basename="/suyashtest-front">  */}
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
@@ -398,18 +400,16 @@ const App = () => {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="users" element={<Users />} />
-           <Route path="users/adduser" element={<AddUser />} />
+          <Route path="users/adduser" element={<AddUser />} />
           <Route path="quotation" element={<Quotation />} />
-          {/* <Route path="master/customermaster" element={<CustomerMaster />} /> */}
           <Route path="master/vendormaster" element={<VendorMaster />} />
           <Route path="master/itemmaster" element={<ItemMaster />} />
           <Route path="master/companymaster" element={<CompanyMaster />} />
           <Route path="master/costingmaster" element={<CostingMaster />} />
           <Route path="master/dimentionmaster" element={<DimentionMaster />} />
-          {/* <Route path="master/operationmaster" element={<OperationMaster />} /> */}
           <Route path="master/processmaster" element={<ProcessMaster />} />
-           <Route path="master/customermaster" element={<CustomerMaster />} />
-           <Route path="master/leadsmaster" element={<LeadsMaster />} />
+          <Route path="master/customermaster" element={<CustomerMaster />} />
+          <Route path="master/leadsmaster" element={<LeadsMaster />} />
           <Route path="master/quotationmaster" element={<QuotationMaster />} />
           <Route path="master/taxmaster" element={<TaxMaster />} />
           <Route path="master/termsandconditionmaster" element={<TermsAndConditionMaster />} />
@@ -422,21 +422,20 @@ const App = () => {
           <Route path="hrmaster/employeemaster" element={<EmployeeMaster />} />
           <Route path="hrmaster/contractmaster" element={<ContractMaster />} />
           <Route path="hrmaster/leavetypemaster" element={<LeaveTypeMaster />} />
-           <Route path="hrmaster/shiftmaster" element={<ShiftMaster />} />
-            {/* <Route path="hrmaster/medicalmaster" element={<MedicalRecordMaster />} /> */}
-             <Route path="hrmaster/accidentmaster" element={<AccidentMaster />} />
-              <Route path="hrmaster/requisitionmaster" element={<RequisitionMaster />} />
-              <Route path="hrmaster/jobopeningmaster" element={<JobOpeningMaster />} />
-              <Route path="hrmaster/candidatemaster" element={<CandidateMaster />} />
-              <Route path="hrmaster/selectedcandidatesmaster" element={<SelectedCandidatesMaster />} />
-               <Route path="hrmaster/salarymaster" element={<SalaryMaster />} />
-                 <Route path="hrmaster/pieceratemaster" element={<PieceRateMaster />} />
-                  <Route path="hrmaster/regularizationmaster" element={<RegularizationMaster />} />
-                  <Route path="hrmaster/productionmaster" element={<ProductionMaster />} />
-                  <Route path="hrmaster/terminationmaster" element={<TerminationMaster />} />
-                  <Route path="hrmaster/employeebehaviormaster" element={<EmployeeBehaviorMaster />} />
-               <Route path="hrmaster/interviewmaster" element={<InterviewMaster />} />
-               <Route path="hrmaster/mediclaimmaster" element={<MediclaimMaster />} />
+          <Route path="hrmaster/shiftmaster" element={<ShiftMaster />} />
+          <Route path="hrmaster/accidentmaster" element={<AccidentMaster />} />
+          <Route path="hrmaster/requisitionmaster" element={<RequisitionMaster />} />
+          <Route path="hrmaster/jobopeningmaster" element={<JobOpeningMaster />} />
+          <Route path="hrmaster/candidatemaster" element={<CandidateMaster />} />
+          <Route path="hrmaster/selectedcandidatesmaster" element={<SelectedCandidatesMaster />} />
+          <Route path="hrmaster/salarymaster" element={<SalaryMaster />} />
+          <Route path="hrmaster/pieceratemaster" element={<PieceRateMaster />} />
+          <Route path="hrmaster/regularizationmaster" element={<RegularizationMaster />} />
+          <Route path="hrmaster/productionmaster" element={<ProductionMaster />} />
+          <Route path="hrmaster/terminationmaster" element={<TerminationMaster />} />
+          <Route path="hrmaster/employeebehaviormaster" element={<EmployeeBehaviorMaster />} />
+          <Route path="hrmaster/interviewmaster" element={<InterviewMaster />} />
+          <Route path="hrmaster/mediclaimmaster" element={<MediclaimMaster />} />
           <Route path="roles" element={<Roles />} />
           <Route path="/roles/add" element={<AddRoles />} />
 
@@ -444,14 +443,12 @@ const App = () => {
           <Route path='hrmaster/adminleavemaster' element={<AdminLeaveApproval/>} />
           <Route path='hrmaster/trainingrecordmaster' element={<TrainingRecordMaster/>} />
 
-
           <Route path='procurementmaster/grnmaster' element={<GRNMaster/>} />
           <Route path='procurementmaster/purchaseordermaster' element={<PurchaseOrderMaster/>} />
           <Route path='procurementmaster/purchaserequisitionmaster' element={<PurchaseRequisitionMaster/>} />
           <Route path='procurementmaster/rfqmaster' element={<RFQMaster/>} />
           <Route path='procurementmaster/purchaseinvoicemaster' element={<PurchaseInvoiceMaster/>} />
           <Route path='procurementmaster/vendor-payments' element={<VendorPayments/>} />
-
 
           <Route path='bommaster/bommaster' element={<BomMaster/>} />
           <Route path='machinemaster/machinemaster' element={<MachineMaster/>} />
@@ -465,28 +462,24 @@ const App = () => {
           <Route path='salesordermaster/sosummary' element={<SOSummary/>} />
           <Route path='salesordermaster/sopendingdelivery' element={<SOPendingDelivery/>} />
 
-
           <Route path='inventorymanagement/warehousemaster' element={<WareHouseMaster />} />
           <Route path="inventorymanagement/stockledger" element={<StockLedgerMaster />} />
           <Route path='inventorymanagement/mivmaster' element={<MIVMaster />} />
           <Route path='inventorymanagement/mrvmaster' element={<MRVMaster />} />
           <Route path='inventorymanagement/psvmaster' element={<PSVMaster />} />
 
-          {/* 👇 PURCHASE RAW MATERIAL ROUTES 👇 */}
+          {/* 👇 PURCHASE RAW MATERIAL ROUTE (Only Master) 👇 */}
           <Route path='inventorymanagement/rmpurchase' element={<RMPurchaseMaster />} />
-          <Route path='inventorymanagement/rmpurchase/add' element={<AddRMPurchase />} />
 
-          {/* 👇 NAYE MATERIAL ISSUE SLIP ROUTES (MIS) 👇 */}
+          {/* 👇 MIS ROUTE (Only Master) 👇 */}
           <Route path='inventorymanagement/mis' element={<MISMaster />} />
-          <Route path='inventorymanagement/mis/add' element={<AddMIS />} />
 
-          {/* 👇 FINISHED GOODS ROUTES 👇 */}
+          {/* 👇 FINISHED GOODS ROUTE (Only Master) 👇 */}
           <Route path='inventorymanagement/finishedgood' element={<FinishedGoodMaster />} />
-          <Route path='inventorymanagement/finishedgood/add' element={<AddFinishedGood />} />
 
           <Route path='productionmaster/workordersmaster' element={<WorkOrdersMaster/>} />
-           <Route path='productionmaster/assemblylines' element={<AssemblyLineMaster/>} />
-             <Route path='productionmaster/productionschedule' element={<ProductionScheduleMaster/>} />
+          <Route path='productionmaster/assemblylines' element={<AssemblyLineMaster/>} />
+          <Route path='productionmaster/productionschedule' element={<ProductionScheduleMaster/>} />
           <Route path='productionmaster/productionconflict' element={<ProductionConflict/>} />
           <Route path='productionmaster/toolmaster' element={<ToolMaster/>} />
           <Route path='productionmaster/subcontractlist' element={<SubcontractList/>} />
@@ -495,7 +488,6 @@ const App = () => {
           <Route path="dispatchmaster/delivery-schedule" element={<DeliveryScheduleMaster />} />
           <Route path="dispatchmaster/customer-returns" element={<CustomerReturnMaster />} />
           
-
           <Route path="inspectionmaster/gaugemaster" element={<GaugeMaster />} />
           <Route path="inspectionmaster/inspectionplan" element={<InspectionPlanMaster />} />
           <Route path="inspectionmaster/inspectionrecord" element={<InspectionRecordMaster />} />
@@ -516,7 +508,6 @@ const App = () => {
           <Route path='reportsmaster/monthlyrevenuereport' element={<MonthlyRevenueReport />} />
         </Route>
 
-        {/* Catch all route - redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

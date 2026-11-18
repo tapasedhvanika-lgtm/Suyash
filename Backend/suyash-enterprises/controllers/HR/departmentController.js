@@ -255,6 +255,15 @@ const deleteDepartment = async (req, res) => {
 };
 
 // @desc    Bulk delete departments
+
+
+
+
+
+
+
+
+
 // @route   DELETE /api/departments/bulk
 // @access  Public
 const bulkDeleteDepartments = async (req, res) => {
@@ -266,7 +275,7 @@ const bulkDeleteDepartments = async (req, res) => {
         success: false, 
         message: 'No departments selected for deletion' 
       });
-    }
+    }                               
 
     // Check if any of the selected departments have employees assigned
     const employeeCount = await Employee.countDocuments({ 

@@ -228,7 +228,7 @@ const getEmployeeBehaviorHistory = async (req, res) => {
           neutralCount: { $sum: { $cond: [{ $eq: ['$type', 'Neutral'] }, 1, 0] } },
           openCount: { $sum: { $cond: [{ $eq: ['$status', 'Open'] }, 1, 0] } },
           escalatedCount: { $sum: { $cond: [{ $eq: ['$status', 'Escalated'] }, 1, 0] } }
-        }
+        }              
       }
     ]);
 
