@@ -1,6 +1,6 @@
 // const BASE_URL = "http://192.168.1.10:5009"
 
-//const BASE_URL = "https://codiantsolutions.com/suyash-enterprises"  
+// const BASE_URL = "https://codiantsolutions.com/suyash-enterprises"  
 
 // const BASE_URL = "https://codiantsolutions.com/api/suyashtest"
 
@@ -35,6 +35,7 @@
 //const BASE_URL = "http://192.168.43.55:5009"
 
 //const BASE_URL = "http://192.168.1.41:5009"
+// 
  const BASE_URL = "http://localhost:5009"
 export default BASE_URL;
 
