@@ -640,6 +640,9 @@ const dispatchRoutes = require('./routes/Dispatch/index');
 
 const agencyRoutes = require('./routes/HR/agencyRoutes');
 
+// 👇 NEW DAILY ATTENDANCE IMPORT 👇
+const dailyAttendanceRoutes = require('./routes/HR/dailyAttendanceRoutes');
+
 
 // Quality Routes
 const ncrRoutes = require('./routes/Quality/ncrRoutes');
@@ -714,6 +717,9 @@ app.use('/api/appointment-letter', appointmentLetterRoutes);
 app.use('/api/employee-behavior', employeeBehaviorRoutes);
 app.use('/api/employee-history', employeeHistoryRoutes);
 app.use("/api/trainings", trainingRoutes);
+
+// 👇 NEW DAILY ATTENDANCE MOUNT 👇
+app.use('/api/daily-attendance', dailyAttendanceRoutes);
 
 // CRM Routes
 app.use('/api/costings', costingRoutes);
@@ -817,7 +823,7 @@ app.get('/', (req, res) => {
       inventory: '/api/warehouses, /api/miv, /api/stock-ledger',
       quality: '/api/inspection-plans, /api/ncrs, /api/gauges',
       bom: '/api/boms',
-      hr: '/api/employees, /api/leaves, /api/trainings'
+      hr: '/api/employees, /api/leaves, /api/trainings, /api/daily-attendance'
     }
   });
 });
